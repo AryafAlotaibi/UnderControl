@@ -1,0 +1,3 @@
+[server]
+# Keep the browser/server upload ceiling aligned with the page copy and validation.
+maxUploadSize = 10
