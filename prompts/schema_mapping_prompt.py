@@ -1,9 +1,13 @@
-def build_schema_mapping_prompt(standard_schema, user_columns, column_samples):
-
+def build_schema_mapping_prompt(
+    standard_schema,
+    user_columns,
+    column_samples
+):
     return f"""
-You are a schema mapping assistant.
+You are the schema-mapping component of UnderControl.
 
-Your task is to map the user's CSV columns to the standard schema.
+Your task is to map columns from an arbitrary project CSV to the
+UnderControl standard schema based on semantic meaning.
 
 STANDARD SCHEMA:
 {standard_schema}
@@ -11,28 +15,34 @@ STANDARD SCHEMA:
 USER COLUMNS:
 {user_columns}
 
-SAMPLE VALUES:
+COLUMN SAMPLES:
 {column_samples}
 
-Rules:
-- Understand columns based on both their names and sample values.
-- Map only when the meaning is reasonably clear.
-- Do not invent mappings.
-- Each user column can map to only one standard column.
-- If a column does not match, mark it as unmapped.
-- If a standard column is not available, mark it as missing.
-- Return JSON only.
+Instructions:
+- Infer each column's meaning using its name and sample values.
+- Map it to a standard field only when the semantic match is clear.
+- Do not infer or fabricate information that is not present in the data.
+- Each source column may map to at most one standard field.
+- Standard fields are normally one-to-one.
+- "text" and "dependency" may receive multiple source columns when
+  several columns contain relevant information for those fields.
+- Distinguish planned deadlines ("due_date") from actual completion
+  dates ("resolution_date").
+- Distinguish internal identifiers ("issue_id") from readable task or
+  ticket keys ("issue_key") when the evidence allows.
+- Columns that do not map confidently to the standard schema should
+  remain unmapped; they will still be preserved downstream.
+- Assign a confidence score from 0.0 to 1.0 to each proposed mapping.
+- Return valid JSON only.
 
-Return exactly this structure:
+Output format:
 
 {{
     "mapping": {{
-        "user_column": "standard_column"
+        "source_column": "standard_field"
     }},
     "confidence": {{
-        "user_column": 0.0
-    }},
-    "unmapped_columns": [],
-    "missing_columns": []
+        "source_column": 0.0
+    }}
 }}
 """
