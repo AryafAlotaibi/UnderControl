@@ -110,7 +110,8 @@ class AnalysisAgent:
             llm=self.llm,
             tools=self.tools,
             prompt=self.prompt,
-        )
+            stop_sequence=False,
+)
 
         self.executor = AgentExecutor(
             agent=agent,
