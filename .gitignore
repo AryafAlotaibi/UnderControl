@@ -5,3 +5,4 @@ __pycache__/
 venv/
 vector_db/
 data/tawos_test_clean.csv
+data/ground_truth_rag_db/
