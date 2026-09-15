@@ -222,25 +222,24 @@ def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=N
         '</div><div class="signal-orbit"><span class="orbit-dot one"></span><span class="orbit-dot two"></span><span class="orbit-dot three"></span><div class="orbit-core">⌁</div></div></div>',
         unsafe_allow_html=True,
     )
-    # Analysis notes are displayed exactly as returned by the Analysis Agent.
-    # The dashboard does not create analytical warnings or infer missing evidence.
-    warnings = analysis_output.get("data_warnings") or []
+    # Analysis limitations come only from the Analysis Agent. The dashboard does
+    # not invent analytical warnings from the uploaded CSV.
+    warnings = list(analysis_output.get("data_warnings") or [])
     delay = analysis_output.get("estimated_delay_days")
     if warnings:
-        st.warning("Analysis Agent notes")
-        with st.expander("Analysis Agent notes", expanded=True):
-            for warning in warnings:
+        st.warning("The Analysis Agent reported limitations in the available evidence.")
+        with st.expander("Analysis Agent data warnings", expanded=True):
+            for warning in dict.fromkeys(warnings):
                 st.write("• " + str(warning))
 
     st.markdown('<div class="section-name">Analysis of the full uploaded project</div>', unsafe_allow_html=True)
-    signals = (project_metrics or {}).get("schedule_signals", analysis_output.get("schedule_signals") or {})
-    has_status = populated(project_df, "status").any()
-    has_resolution = any(populated(project_df, c).any() for c in ("status", "resolution", "resolution_date"))
+    # These values are displayed exactly from the structured Analysis Agent output.
+    signals = analysis_output.get("schedule_signals") or {}
     overview = [
-        ("Estimated delay", None if delay is None else f"{delay:g} days", "Evidence-based estimate"),
-        ("Blocked tasks", signals.get("blocked_tasks") if has_status else None, "Based on known statuses"),
-        ("Overdue tasks", signals.get("overdue_tasks") if has_resolution and populated(project_df, "due_date").any() else None, "Unresolved tasks past their due date"),
-        ("High-priority unfinished", signals.get("unfinished_high_priority_tasks") if has_resolution and populated(project_df, "priority").any() else None, "High, Highest, Critical or Blocker"),
+        ("Estimated delay", None if delay is None else f"{delay:g} days", "Analysis Agent"),
+        ("Blocked tasks", signals.get("blocked_tasks"), "Analysis Agent schedule signal"),
+        ("Overdue tasks", signals.get("overdue_tasks"), "Analysis Agent schedule signal"),
+        ("High-priority unfinished", signals.get("unfinished_high_priority_tasks"), "Analysis Agent schedule signal"),
     ]
     for column, (label, value, note) in zip(st.columns(4), overview):
         with column:
@@ -305,41 +304,74 @@ def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=N
     with st.container(border=True):
         st.subheader("Root cause")
         if root:
-            st.write(root.get("summary", ""))
-            st.write(root.get("explanation", ""))
+            category = root.get("category")
+            if category:
+                st.caption(f"Category: {category}")
+            st.write(root.get("summary") or "Not provided by the Analysis Agent.")
+            st.write(root.get("explanation") or "Not provided by the Analysis Agent.")
+            affected = root.get("affected_tasks") or []
+            st.write("Affected tasks: " + (", ".join(map(str, affected)) if affected else "Not provided by the Analysis Agent."))
         else:
-            st.write("Not provided by the Analysis Agent.")
+            st.info("Not provided by the Analysis Agent.")
 
     tabs = st.tabs(["Bottlenecks", "Critical tasks", "Dependencies", "Workload", "Evidence"])
     with tabs[0]:
         rows = analysis_output.get("bottlenecks") or []
         if not rows:
-            st.write("Not provided by the Analysis Agent.")
+            st.info("Not provided by the Analysis Agent.")
         for item in rows:
-            with st.expander(f"{item.get('task_id', 'Task')} · {item.get('summary', '')}", expanded=True):
-                st.write(item.get("reason", ""))
-                st.write("Impact: " + item.get("impact", "Not available"))
+            task_id = item.get("task_id") or "Task"
+            summary = item.get("summary") or ""
+            with st.expander(f"{task_id} · {summary}".rstrip(" ·"), expanded=True):
+                details = []
+                if item.get("status"):
+                    details.append(f"Status: {item['status']}")
+                if item.get("priority"):
+                    details.append(f"Priority: {item['priority']}")
+                if item.get("assignee"):
+                    details.append(f"Assignee: {item['assignee']}")
+                if details:
+                    st.caption(" · ".join(details))
+                st.write("Reason: " + (item.get("reason") or "Not provided by the Analysis Agent."))
+                st.write("Impact: " + (item.get("impact") or "Not provided by the Analysis Agent."))
+                affected = item.get("affected_tasks") or []
+                st.write("Affected tasks: " + (", ".join(map(str, affected)) if affected else "Not provided by the Analysis Agent."))
     with tabs[1]:
         rows = analysis_output.get("critical_tasks") or []
         if rows:
-            st.dataframe(pd.DataFrame(rows).rename(columns={"task_id": "Task", "reason": "Why it matters"}), hide_index=True, use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(rows).rename(columns={"task_id": "Task", "reason": "Why it matters"}),
+                hide_index=True,
+                use_container_width=True,
+            )
         else:
-            st.write("Not provided by the Analysis Agent.")
+            st.info("Not provided by the Analysis Agent.")
     with tabs[2]:
         rows = analysis_output.get("dependencies") or []
         if rows:
-            st.dataframe(pd.DataFrame(rows).rename(columns={"blocked_task": "Blocked task", "depends_on": "Depends on", "impact": "Impact", "affected_tasks": "Affected tasks"}), hide_index=True, use_container_width=True)
+            dependency_df = pd.DataFrame(rows).rename(columns={
+                "blocked_task": "Blocked task",
+                "depends_on": "Depends on",
+                "impact": "Impact",
+                "affected_tasks": "Affected tasks",
+            })
+            st.dataframe(dependency_df, hide_index=True, use_container_width=True)
         else:
-            st.write("Not provided by the Analysis Agent.")
+            st.info("Not provided by the Analysis Agent.")
     with tabs[3]:
         rows = analysis_output.get("workload_signals") or []
-        for item in rows:
-            st.write(f"Assignee {item.get('assignee') or 'unavailable'}: {item.get('issue', '')}")
         if not rows:
-            st.write("Not provided by the Analysis Agent.")
+            st.info("Not provided by the Analysis Agent.")
+        for item in rows:
+            with st.container(border=True):
+                st.write(f"Assignee: {item.get('assignee') or 'Not provided by the Analysis Agent.'}")
+                st.write("Issue: " + (item.get("issue") or "Not provided by the Analysis Agent."))
+                related = item.get("related_tasks") or []
+                st.write("Related tasks: " + (", ".join(map(str, related)) if related else "Not provided by the Analysis Agent."))
     with tabs[4]:
         rows = analysis_output.get("evidence") or []
-        for item in rows:
-            st.write(f"• {item}")
-        if not rows:
-            st.write("Not provided by the Analysis Agent.")
+        if rows:
+            for item in rows:
+                st.write(f"• {item}")
+        else:
+            st.info("Not provided by the Analysis Agent.")
