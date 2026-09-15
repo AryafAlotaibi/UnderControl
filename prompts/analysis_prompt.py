@@ -435,15 +435,24 @@ EVIDENCE POLICY
   data_warnings and lower confidence when appropriate.
 - estimated_delay_days must be null unless timing or schedule evidence
   supports a reliable numeric estimate.
-- affected_tasks may contain only task IDs supported by an explicit
-  dependency, blocker relationship, direct task reference, or clear
-  project text showing that one task affects another.
+- For root_cause and bottlenecks, affected_tasks may contain only task IDs
+  supported by explicit project evidence showing a real impact relationship.
+- For dependencies:
+  - depends_on is the direct prerequisite or blocking task.
+  - blocked_task is the task directly affected by that dependency.
+  - affected_tasks contains only additional downstream tasks affected by
+    the dependency chain.
+  - Do not include blocked_task itself in affected_tasks.
 - Do not infer affected_tasks from shared assignees, priorities, statuses,
   similar descriptions, or project area alone.
 - If affected tasks cannot be verified, return an empty list.
+- For workload_signals, related_tasks contains only task IDs explicitly
+  associated with the reported assignee workload.
 - Do not generate recovery strategies, reprioritize work, or run
   simulations. These belong to the Simulation Agent.
 
+
+  
 
 REACT FORMAT
 
@@ -527,7 +536,7 @@ FINAL JSON STRUCTURE
     {{
       "assignee": null,
       "issue": "",
-      "affected_tasks": []
+      "related_tasks": []
     }}
   ],
 
