@@ -1,12 +1,117 @@
+import html
+
+import pandas as pd
 import streamlit as st
 
+from analysis.project_analyzer import ProjectAnalyzer
 
-def render_dashboard_ui() -> None:
-    """White visual dashboard shell based on the retained TAWOS fields only."""
+
+# These aliases are only for displaying the uploaded table. The backend continues
+# to receive the original dataframe and keeps its own schema mapping unchanged.
+DISPLAY_ALIASES = {
+    "issue_id": ("issue_id", "Issue id", "Task ID"),
+    "issue_key": ("issue_key", "Issue key", "Task key"),
+    "text": ("text", "Summary", "Task name", "Title", "Description"),
+    "project_key": ("project_key", "Project key"),
+    "project_name": ("project_name", "Project name", "Project"),
+    "type": ("type", "Issue Type", "Task type"),
+    "priority": ("priority", "Priority"),
+    "status": ("status", "Status", "Task status"),
+    "resolution": ("resolution", "Resolution"),
+    "assignee_id": ("assignee_id", "Custom field (Assignee_ID)", "Assignee"),
+    "creation_date": ("creation_date", "Created", "Creation date"),
+    "due_date": ("due_date", "Due date", "Deadline"),
+    "resolution_date": ("resolution_date", "Resolved", "Resolution date"),
+    "story_point": ("story_point", "Story points", "Story Points", "Custom field (Story Points)"),
+    "resolution_time_minutes": ("resolution_time_minutes",),
+}
+
+
+def populated(df, column):
+    if column not in df:
+        return pd.Series(False, index=df.index)
+    values = df[column].astype("string").str.strip()
+    return (values.notna() & ~values.str.lower().isin(["", "nan", "none", "null", "nat"])).fillna(False)
+
+
+def prepare_dashboard_data(user_df):
+    """Read common Jira/standard headings for presentation; keep raw data intact."""
+    lookup = {str(c).strip().casefold(): c for c in user_df.columns}
+    frame = pd.DataFrame(index=user_df.index)
+    for target, aliases in DISPLAY_ALIASES.items():
+        for alias in aliases:
+            source = lookup.get(alias.casefold())
+            if source is not None and populated(user_df, source).any():
+                frame[target] = user_df[source].copy()
+                break
+    for column in ("creation_date", "due_date", "resolution_date"):
+        if column in frame:
+            frame[column] = pd.to_datetime(frame[column], errors="coerce", format="mixed", utc=True).dt.tz_convert(None)
+    for column in ("story_point", "resolution_time_minutes"):
+        if column in frame:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    for column in ("status", "priority", "type", "assignee_id", "project_name", "project_key"):
+        if column in frame:
+            frame[column] = frame[column].astype("string").str.strip()
+    return frame
+
+
+def display_values(df, field):
+    if field not in df:
+        return pd.Series("Not provided", index=df.index, dtype="string")
+    return df[field].astype("string").str.strip().where(populated(df, field), "Not provided")
+
+
+def metric_card(label, value, note):
+    unavailable = value is None or (isinstance(value, float) and pd.isna(value))
+    value_text = "Not available" if unavailable else str(value)
+    size = "font-size:19px" if unavailable else ""
+    st.markdown(
+        f'<div class="stat-card"><div class="stat-label">{html.escape(label)}</div>'
+        f'<div class="stat-value" style="{size}">{html.escape(value_text)}</div>'
+        f'<div class="stat-source">{html.escape(note)}</div></div>', unsafe_allow_html=True
+    )
+
+
+def render_distribution(frame, field, title, color):
+    with st.container(border=True):
+        st.subheader(title)
+        if not populated(frame, field).any():
+            st.info("Not enough data to display this chart. Add " + title.lower() + " to your file.")
+            return
+        counts = display_values(frame, field).value_counts().rename_axis(title).rename("Tasks").reset_index()
+        # A fixed, non-zoomable count axis keeps scroll gestures from panning
+        # the plot into negative values or clipping the bars.
+        maximum = int(counts["Tasks"].max())
+        chart = {
+            "height": max(200, min(len(counts) * 40, 800)),
+            "encoding": {
+                "y": {"field": title, "type": "nominal", "sort": "-x", "title": None,
+                      "axis": {"labelLimit": 180}},
+                "x": {"field": "Tasks", "type": "quantitative", "title": "Tasks",
+                      "scale": {"domain": [0, maximum + max(1, maximum * 0.15)], "nice": False, "zero": True},
+                      "axis": {"format": "d", "tickMinStep": 1}},
+                "tooltip": [{"field": title, "type": "nominal"},
+                            {"field": "Tasks", "type": "quantitative", "format": "d"}],
+            },
+            "layer": [
+                {"mark": {"type": "bar", "color": color, "cornerRadiusEnd": 4, "size": 25}},
+                {"mark": {"type": "text", "align": "left", "dx": 6, "color": "#273751"},
+                 "encoding": {"text": {"field": "Tasks", "type": "quantitative", "format": "d"}}},
+            ],
+            "background": "#FFFFFF", "config": {"view": {"stroke": None}, "axis": {"labelColor": "#60718A", "titleColor": "#60718A", "gridColor": "#E5ECF7", "domain": False, "labelFontSize": 12}},
+        }
+        st.vega_lite_chart(counts, chart, width="stretch", theme=None, key=f"distribution_{field}")
+
+
+def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=None, source_name=None) -> None:
+    """Display real uploaded task data and the unchanged backend analysis result."""
     st.markdown(
         """
 <style>
-    .stApp { background: #F8FAFE; }
+    .stApp { background: #F8FAFE; color: #16223B; }
+    .stApp h1,.stApp h2,.stApp h3 { color: #16223B; }
+    div[data-testid="stSelectbox"] input, div[data-testid="stSelectbox"] span { color: #273751 !important; -webkit-text-fill-color: #273751; }
     header { visibility: hidden; }
     .block-container { max-width: 1480px; padding: 24px 36px 72px; }
     .uc-nav { display:flex; align-items:center; justify-content:space-between; padding:16px 2px 25px; }
@@ -21,8 +126,9 @@ def render_dashboard_ui() -> None:
     .stat-card { min-height:128px; padding:18px; box-sizing:border-box; background:#FFF; border:1px solid #E5ECF7; border-radius:16px; box-shadow:0 10px 24px rgba(27,55,97,.045); overflow:hidden; position:relative; }
     .stat-card::after { content:""; position:absolute; width:80px; height:80px; right:-25px; bottom:-39px; border-radius:50%; background:radial-gradient(circle,rgba(89,137,248,.12),transparent 68%); }
     .stat-label { color:#74849C; font-size:11px; font-weight:700; }
-    .stat-value { margin-top:10px; color:#16223B; font-size:28px; font-weight:790; letter-spacing:-.06em; }
-    .stat-source { margin-top:7px; color:#A0AEC1; font-size:10px; }
+    .stat-card { height:128px; display:flex; flex-direction:column; margin-bottom:12px; }
+    .stat-value { margin-top:10px; line-height:32px; flex-shrink:0; color:#16223B; font-size:28px; font-weight:790; letter-spacing:-.06em; }
+    .stat-source { margin-top:auto; color:#A0AEC1; font-size:10px; }
     .section-name { margin:29px 0 12px; color:#182641; font-size:16px; font-weight:760; letter-spacing:-.025em; }
     .widget { height:100%; min-height:280px; box-sizing:border-box; padding:19px; background:#FFF; border:1px solid #E5ECF7; border-radius:16px; box-shadow:0 10px 24px rgba(27,55,97,.04); }
     .widget-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }
@@ -82,77 +188,158 @@ def render_dashboard_ui() -> None:
         unsafe_allow_html=True,
     )
 
-    st.link_button("← Back to upload", url="?view=upload")
+    if st.button("← Upload another file", key="dashboard_back"):
+        for key in ("analysis_output", "project_dataframe", "project_metrics", "analyzed_filename"):
+            st.session_state.pop(key, None)
+        st.session_state["uploader_version"] = st.session_state.get("uploader_version", 0) + 1
+        for key in ("dashboard_project", "dashboard_status", "dashboard_priority"):
+            st.session_state.pop(key, None)
+        st.query_params["view"] = "upload"
+        st.rerun()
+
     st.markdown('<div class="uc-nav"><div class="uc-identity"><span class="uc-mark">⌁</span>UNDER CONTROL</div><div class="uc-breadcrumb">Workspace / Project dashboard</div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="eyebrow">ISSUE INTELLIGENCE</div>', unsafe_allow_html=True)
-    st.markdown('<div class="dashboard-title">Turn issue history into clear direction.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="dashboard-subtitle">Project work, priority, delivery timing, and issue flow — arranged in one focused view.</div>', unsafe_allow_html=True)
-    st.markdown('<span class="preview-label">Dashboard layout preview</span>', unsafe_allow_html=True)
+    if not analysis_output or project_df is None or len(project_df) == 0:
+        st.info("No complete dashboard is available in this session. Upload your project CSV and select Analyze Project to view its results.")
+        return
+
+    st.markdown('<div class="eyebrow">PROJECT OVERVIEW</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dashboard-title">Your project at a glance.</div>', unsafe_allow_html=True)
+    st.caption(f"Source: {source_name or 'Uploaded project'} · {len(project_df):,} tasks analyzed")
+
+    state = analysis_output.get("project_state")
+    state_label = {"healthy": "Healthy", "delayed": "Delayed", "uncertain": "Not enough evidence to determine project health"}.get(state, "Project health unavailable")
+    state_detail = {
+        "healthy": "The analysis found evidence supporting a healthy project state.",
+        "delayed": "The analysis found evidence of project delay. Review the supporting findings below.",
+        "uncertain": "You can explore the available task data below. More information is needed to determine overall project health."
+    }.get(state, "Review the available data and analysis limitations below.")
     st.markdown(
-        '<div class="command-deck">'
-        '<div class="command-copy"><div class="command-eyebrow">PROJECT COMMAND CENTER</div>'
-        '<div class="command-title">Follow the work. Catch friction early.</div>'
-        '<div class="command-text">One visual home for projects, issues, priority, timing, and story points — built around your Jira structure.</div>'
-        '<div class="command-tags"><span>Projects</span><span>Issue flow</span><span>Priority</span><span>Delivery time</span></div></div>'
-        '<div class="signal-orbit"><span class="orbit-dot one"></span><span class="orbit-dot two"></span><span class="orbit-dot three"></span><div class="orbit-core">⌁</div></div>'
-        '</div>',
+        '<div class="command-deck"><div class="command-copy">'
+        '<div class="command-eyebrow">PROJECT HEALTH</div>'
+        f'<div class="command-title">{html.escape(state_label)}</div>'
+        f'<div class="command-text">{html.escape(state_detail)}</div>'
+        f'<div class="command-tags"><span>Confidence: {html.escape(str(analysis_output.get("confidence", "Unavailable")).title())}</span></div>'
+        '</div><div class="signal-orbit"><span class="orbit-dot one"></span><span class="orbit-dot two"></span><span class="orbit-dot three"></span><div class="orbit-core">⌁</div></div></div>',
         unsafe_allow_html=True,
     )
-    st.markdown(
-        '<div class="signal-path"><span class="path-label">Issue path</span>'
-        '<div class="path-node one">Project<small>project_key</small></div><span class="path-link"></span>'
-        '<div class="path-node two">Issue<small>issue_key</small></div><span class="path-link"></span>'
-        '<div class="path-node three">Status<small>status</small></div><span class="path-link"></span>'
-        '<div class="path-node four">Resolution<small>resolution</small></div></div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown('<div class="control-label">Dashboard controls</div>', unsafe_allow_html=True)
+    # Analysis notes are displayed exactly as returned by the Analysis Agent.
+    # The dashboard does not create analytical warnings or infer missing evidence.
+    warnings = analysis_output.get("data_warnings") or []
+    delay = analysis_output.get("estimated_delay_days")
+    if warnings:
+        st.warning("Analysis Agent notes")
+        with st.expander("Analysis Agent notes", expanded=True):
+            for warning in warnings:
+                st.write("• " + str(warning))
 
-    first_filter, second_filter, third_filter = st.columns([1.25, 1, 1])
-    with first_filter:
-        st.selectbox("Project", ["Choose a project"], disabled=True)
-    with second_filter:
-        st.selectbox("Issue status", ["All statuses"], disabled=True)
-    with third_filter:
-        st.selectbox("Priority", ["All priorities"], disabled=True)
-
-    metrics = st.columns(4)
-    stat_definitions = [
-        ("Total issues", "issue_id · issue_key"),
-        ("Resolved work", "status · resolution"),
-        ("Resolution time", "resolution_time_minutes"),
-        ("Story points", "story_point"),
+    st.markdown('<div class="section-name">Analysis of the full uploaded project</div>', unsafe_allow_html=True)
+    signals = (project_metrics or {}).get("schedule_signals", analysis_output.get("schedule_signals") or {})
+    has_status = populated(project_df, "status").any()
+    has_resolution = any(populated(project_df, c).any() for c in ("status", "resolution", "resolution_date"))
+    overview = [
+        ("Estimated delay", None if delay is None else f"{delay:g} days", "Evidence-based estimate"),
+        ("Blocked tasks", signals.get("blocked_tasks") if has_status else None, "Based on known statuses"),
+        ("Overdue tasks", signals.get("overdue_tasks") if has_resolution and populated(project_df, "due_date").any() else None, "Unresolved tasks past their due date"),
+        ("High-priority unfinished", signals.get("unfinished_high_priority_tasks") if has_resolution and populated(project_df, "priority").any() else None, "High, Highest, Critical or Blocker"),
     ]
-    for column, (label, source) in zip(metrics, stat_definitions):
+    for column, (label, value, note) in zip(st.columns(4), overview):
         with column:
-            st.markdown(f'<div class="stat-card"><div class="stat-label">{label}</div><div class="stat-value">—</div><div class="stat-source">{source}</div><div class="mini-spark"><span style="height:35%"></span><span style="height:56%"></span><span style="height:43%"></span><span style="height:84%"></span><span style="height:64%"></span></div></div>', unsafe_allow_html=True)
+            metric_card(label, value, note)
 
-    st.markdown('<div class="section-name">Delivery signals</div>', unsafe_allow_html=True)
-    flow_column, priority_column = st.columns([1.62, 1], gap="large")
-    with flow_column:
-        st.markdown(
-            '''<div class="widget"><div class="widget-head"><div><div class="widget-title">Issue lifecycle</div><div class="widget-note">From creation to resolution</div></div><span class="field-chip">creation_date · resolution_date</span></div>
-            <svg viewBox="0 0 720 180" width="100%" height="178" role="img" aria-label="Issue flow visual placeholder"><defs><linearGradient id="blueArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#4B88F5" stop-opacity=".22"/><stop offset="1" stop-color="#4B88F5" stop-opacity="0"/></linearGradient><linearGradient id="violetArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8B5CF6" stop-opacity=".16"/><stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/></linearGradient></defs><g stroke="#EDF1F7" stroke-width="1"><line x1="0" x2="720" y1="25" y2="25"/><line x1="0" x2="720" y1="75" y2="75"/><line x1="0" x2="720" y1="125" y2="125"/></g><path d="M0 125 C64 114 80 92 139 96 S216 57 277 71 S361 43 424 55 S520 35 570 54 S665 33 720 42 L720 180 L0 180Z" fill="url(#blueArea)"/><path d="M0 125 C64 114 80 92 139 96 S216 57 277 71 S361 43 424 55 S520 35 570 54 S665 33 720 42" fill="none" stroke="#4687F5" stroke-width="3"/><path d="M0 147 C61 140 97 148 146 129 S224 132 280 115 S365 133 431 106 S530 121 588 93 S666 112 720 97 L720 180 L0 180Z" fill="url(#violetArea)"/><path d="M0 147 C61 140 97 148 146 129 S224 132 280 115 S365 133 431 106 S530 121 588 93 S666 112 720 97" fill="none" stroke="#8B5CF6" stroke-width="3"/></svg><div class="legend"><span><i style="background:#4687F5"></i>Created</span><span><i style="background:#8B5CF6"></i>Resolved</span></div></div>''',
-            unsafe_allow_html=True,
-        )
-    with priority_column:
-        st.markdown(
-            '''<div class="widget"><div class="widget-head"><div><div class="widget-title">Priority mix</div><div class="widget-note">Issue severity distribution</div></div><span class="field-chip">priority</span></div>
-            <div class="priority-row"><span class="priority-name">Blocker</span><span class="priority-track"><span class="priority-fill" style="display:block;width:30%;background:#FB7185"></span></span><span class="priority-value">—</span></div>
-            <div class="priority-row"><span class="priority-name">Critical</span><span class="priority-track"><span class="priority-fill" style="display:block;width:48%;background:#F59E0B"></span></span><span class="priority-value">—</span></div>
-            <div class="priority-row"><span class="priority-name">Major</span><span class="priority-track"><span class="priority-fill" style="display:block;width:76%;background:#5B8DF5"></span></span><span class="priority-value">—</span></div>
-            <div class="priority-row"><span class="priority-name">Minor</span><span class="priority-track"><span class="priority-fill" style="display:block;width:57%;background:#2DD4BF"></span></span><span class="priority-value">—</span></div></div>''',
-            unsafe_allow_html=True,
-        )
+    st.markdown('<div class="section-name">Explore tasks</div>', unsafe_allow_html=True)
+    st.caption("Filters update the task cards, charts and register below. The analysis above and findings below describe the full upload.")
+    filtered = project_df.copy()
+    project_column = "project_name" if populated(filtered, "project_name").any() else "project_key"
+    for container, field, label, key in zip(
+        st.columns([1.25, 1, 1]),
+        (project_column, "status", "priority"),
+        ("Project", "Issue status", "Priority"),
+        ("dashboard_project", "dashboard_status", "dashboard_priority"),
+    ):
+        with container:
+            values = display_values(project_df, field)
+            options = sorted(values.unique().tolist()) if populated(project_df, field).any() else []
+            selected = st.selectbox(label, [None] + options, format_func=lambda value: "All" if value is None else value,
+                                    key=key, disabled=not options)
+            if selected is not None:
+                filtered = filtered[display_values(filtered, field) == selected]
 
-    st.markdown('<div class="section-name">Work context</div>', unsafe_allow_html=True)
-    type_column, context_column = st.columns([1, 1], gap="large")
-    with type_column:
-        st.markdown('<div class="widget"><div class="widget-head"><div><div class="widget-title">Issue types</div><div class="widget-note">How work is categorised</div></div><span class="field-chip">type</span></div><div class="type-list"><div class="type-item"><span class="type-dot" style="background:#4F8AF7"></span>Bug</div><div class="type-item"><span class="type-dot" style="background:#8B5CF6"></span>Story</div><div class="type-item"><span class="type-dot" style="background:#2DD4BF"></span>Task</div><div class="type-item"><span class="type-dot" style="background:#FB9A5B"></span>Improvement</div></div></div>', unsafe_allow_html=True)
-    with context_column:
-        st.markdown('<div class="widget"><div class="widget-head"><div><div class="widget-title">Project identifiers</div><div class="widget-note">Identifiers and work detail</div></div><span class="field-chip">project_key · text</span></div><div class="type-list"><div class="type-item"><span class="type-dot" style="background:#386FF0"></span>project_key</div><div class="type-item"><span class="type-dot" style="background:#7B61E6"></span>project_name</div><div class="type-item"><span class="type-dot" style="background:#20BDAA"></span>issue_key</div><div class="type-item"><span class="type-dot" style="background:#F2895B"></span>text</div></div></div>', unsafe_allow_html=True)
+    if len(filtered) == 0:
+        st.info("No tasks match these filters. Choose All to broaden your selection.")
+    else:
+        metrics = ProjectAnalyzer().prepare_project(filtered)["metrics"]
+        known_resolution = any(populated(filtered, c).any() for c in ("status", "resolution", "resolution_date"))
+        resolution = metrics.get("average_resolution_time_minutes")
+        points = pd.to_numeric(filtered["story_point"], errors="coerce") if "story_point" in filtered else pd.Series(dtype=float)
+        point_total = points.sum(min_count=1)
+        stats = [
+            ("Total issues", len(filtered), "Tasks matching your filters"),
+            ("Resolved work", metrics.get("resolved_issues") if known_resolution else None, "Known completion signals"),
+            ("Avg. resolution time", None if resolution is None else f"{resolution:,.0f} min", "Recorded resolution duration"),
+            ("Story points", None if pd.isna(point_total) else f"{point_total:,.1f}", "Sum of available estimates"),
+        ]
+        for column, (label, value, note) in zip(st.columns(4), stats):
+            with column:
+                metric_card(label, value, note)
+        for container, field, title, color in zip(st.columns(2), ("status", "priority"), ("Issue status", "Priority mix"), ("#4B88F5", "#8B5CF6")):
+            with container:
+                render_distribution(filtered, field, title, color)
+        for container, field, title, color in zip(st.columns(2), ("type", "assignee_id"), ("Issue types", "Tasks per assignee"), ("#20BDAA", "#4B88F5")):
+            with container:
+                render_distribution(filtered, field, title, color)
+        st.markdown('<div class="section-name">Issue register</div>', unsafe_allow_html=True)
+        labels = {"issue_key": "Issue", "issue_id": "ID", "text": "Task details", "type": "Type", "priority": "Priority", "status": "Status", "assignee_id": "Assignee", "creation_date": "Created", "due_date": "Due", "resolution_date": "Resolved", "story_point": "Story points"}
+        columns = [c for c in labels if c in filtered and populated(filtered, c).any()]
+        if columns:
+            date_columns = {
+                labels[c]: st.column_config.DatetimeColumn(labels[c], format="YYYY-MM-DD")
+                for c in ("creation_date", "due_date", "resolution_date") if c in columns
+            }
+            st.dataframe(filtered[columns].rename(columns=labels), hide_index=True,
+                         width="stretch", column_config=date_columns)
+        else:
+            st.info("Task details cannot be displayed with the column names supplied in this file.")
 
-    st.markdown('<div class="section-name">Issue register</div>', unsafe_allow_html=True)
-    table_head = '<div class="issue-head"><span>Issue key</span><span>Type</span><span>Priority</span><span>Status</span><span>Created</span><span>Story points</span></div>'
-    table_row = '<div class="issue-row"><span class="skeleton"></span><span class="soft-tag"></span><span class="soft-tag"></span><span class="soft-tag"></span><span class="skeleton"></span><span class="skeleton"></span></div>'
-    st.markdown(f'<div class="issue-shell">{table_head}{table_row}{table_row}{table_row}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-name">Analysis findings · full upload</div>', unsafe_allow_html=True)
+    root = analysis_output.get("root_cause")
+    with st.container(border=True):
+        st.subheader("Root cause")
+        if root:
+            st.write(root.get("summary", ""))
+            st.write(root.get("explanation", ""))
+        else:
+            st.write("Not provided by the Analysis Agent.")
+
+    tabs = st.tabs(["Bottlenecks", "Critical tasks", "Dependencies", "Workload", "Evidence"])
+    with tabs[0]:
+        rows = analysis_output.get("bottlenecks") or []
+        if not rows:
+            st.write("Not provided by the Analysis Agent.")
+        for item in rows:
+            with st.expander(f"{item.get('task_id', 'Task')} · {item.get('summary', '')}", expanded=True):
+                st.write(item.get("reason", ""))
+                st.write("Impact: " + item.get("impact", "Not available"))
+    with tabs[1]:
+        rows = analysis_output.get("critical_tasks") or []
+        if rows:
+            st.dataframe(pd.DataFrame(rows).rename(columns={"task_id": "Task", "reason": "Why it matters"}), hide_index=True, use_container_width=True)
+        else:
+            st.write("Not provided by the Analysis Agent.")
+    with tabs[2]:
+        rows = analysis_output.get("dependencies") or []
+        if rows:
+            st.dataframe(pd.DataFrame(rows).rename(columns={"blocked_task": "Blocked task", "depends_on": "Depends on", "impact": "Impact", "affected_tasks": "Affected tasks"}), hide_index=True, use_container_width=True)
+        else:
+            st.write("Not provided by the Analysis Agent.")
+    with tabs[3]:
+        rows = analysis_output.get("workload_signals") or []
+        for item in rows:
+            st.write(f"Assignee {item.get('assignee') or 'unavailable'}: {item.get('issue', '')}")
+        if not rows:
+            st.write("Not provided by the Analysis Agent.")
+    with tabs[4]:
+        rows = analysis_output.get("evidence") or []
+        for item in rows:
+            st.write(f"• {item}")
+        if not rows:
+            st.write("Not provided by the Analysis Agent.")

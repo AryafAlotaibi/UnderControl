@@ -21,7 +21,6 @@
 
 # st.set_page_config(
 #     page_title="Under Control",
-#     page_icon="🎯",
 #     layout="centered",
 #     initial_sidebar_state="collapsed"
 # )
@@ -781,10 +780,12 @@
 #     unsafe_allow_html=True,
 # )
 import io
-import json
+import logging
+import hashlib
+from time import perf_counter
 import pandas as pd
 
-from pipeline.pipeline import run_analysis
+#from pipeline.pipeline import run_analysis
 import html
 import importlib
 
@@ -799,7 +800,15 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 def clear_uploaded_file():
     """Rebuild the native uploader empty when the user removes a file."""
     st.session_state["uploader_version"] = st.session_state.get("uploader_version", 0) + 1
-    st.session_state.pop("analysis_output", None)
+    clear_analysis_result()
+    st.session_state.pop("uploaded_fingerprint", None)
+
+
+def clear_analysis_result():
+    for key in ("analysis_output", "project_dataframe", "analyzed_filename"):
+        st.session_state.pop(key, None)
+    for key in ("dashboard_project", "dashboard_status", "dashboard_priority"):
+        st.session_state.pop(key, None)
 
 
 def read_uploaded_csv(uploaded_file):
@@ -815,6 +824,7 @@ def read_uploaded_csv(uploaded_file):
                 engine="python",
             )
 
+            dataframe = dataframe.replace(r"^\s*$", pd.NA, regex=True).dropna(how="all")
             if dataframe.empty:
                 raise ValueError("The uploaded CSV contains no data.")
 
@@ -822,7 +832,7 @@ def read_uploaded_csv(uploaded_file):
 
         except UnicodeDecodeError:
             continue
-        except pd.errors.ParserError:
+        except (pd.errors.ParserError, pd.errors.EmptyDataError, pd.errors.ParserWarning):
             continue
 
     raise ValueError(
@@ -843,7 +853,11 @@ st.set_page_config(
 
 if st.query_params.get("view") == "dashboard":
     importlib.reload(dashboard_white_ui)
-    dashboard_white_ui.render_dashboard_ui()
+    dashboard_white_ui.render_dashboard_ui(
+        analysis_output=st.session_state.get("analysis_output"),
+        project_df=st.session_state.get("project_dataframe"),
+        source_name=st.session_state.get("analyzed_filename"),
+    )
     st.stop()
 
 
@@ -1550,6 +1564,10 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
+    fingerprint = hashlib.sha256(uploaded_file.getvalue()).hexdigest() + uploaded_file.name
+    if st.session_state.get("uploaded_fingerprint") != fingerprint:
+        clear_analysis_result()
+        st.session_state["uploaded_fingerprint"] = fingerprint
     file_size = uploaded_file.size / (1024 * 1024)
 
     if uploaded_file.size > MAX_UPLOAD_BYTES:
@@ -1580,48 +1598,50 @@ if uploaded_file is not None:
             type="primary",
             use_container_width=True,
         ):
+            clear_analysis_result()
             try:
-                # 1. Read the uploaded CSV as user-provided project data.
                 user_df = read_uploaded_csv(uploaded_file)
-
-                # 2. Run the complete Analysis Agent pipeline:
-                #    SchemaMapper -> ProjectAnalyzer -> Live RAG
-                #    -> Ground Truth RAG tools -> Analysis Agent.
-                with st.spinner("Analyzing project..."):
-                    analysis_result = run_analysis(user_df)
-
-                # 3. Convert Pydantic output to a regular dictionary if needed.
-                if hasattr(analysis_result, "model_dump"):
-                    analysis_result = analysis_result.model_dump()
-
-                # 4. Keep the Analysis Agent output in session state.
-                #    This is the object that will be passed to the Simulation Agent.
-                st.session_state["analysis_output"] = analysis_result
-
-                st.success("Project analysis completed.")
-
-            except Exception as error:
-                st.session_state.pop("analysis_output", None)
-                st.error(f"Analysis failed: {error}")
+                if len(user_df.columns) < 2:
+                    raise ValueError("This file doesn't contain enough task information. Upload a CSV with task IDs or descriptions and details such as status, priority, or dates.")
+            except (ValueError, pd.errors.ParserError, pd.errors.EmptyDataError) as error:
+                st.warning(str(error))
+            else:
+                try:
+                    # The backend receives the original upload, unchanged.
+                    with st.status("Analyzing your project...", expanded=True) as analysis_status:
+                        st.write(f"File read successfully: {len(user_df):,} tasks.")
+                        started = perf_counter()
+                        with st.spinner("Preparing analysis tools...", show_time=True):
+                            from pipeline.pipeline import run_analysis
+                        tools_ready = perf_counter()
+                        with st.spinner("Analyzing the project and gathering evidence. Please keep this page open...", show_time=True):
+                            analysis_result = run_analysis(user_df)
+                        analysis_finished = perf_counter()
+                        timing_logger = logging.getLogger("undercontrol.ui.timing")
+                        timing_logger.setLevel(logging.INFO)
+                        timing_logger.info("Analysis tools loaded in %.1fs; backend analysis completed in %.1fs",
+                                           tools_ready - started, analysis_finished - tools_ready)
+                        analysis_status.update(label="Analysis completed. Preparing your dashboard...", state="complete", expanded=False)
+                    if hasattr(analysis_result, "model_dump"):
+                        analysis_result = analysis_result.model_dump()
+                    if not isinstance(analysis_result, dict) or not analysis_result:
+                        raise RuntimeError("No structured analysis was returned.")
+                    st.session_state["project_dataframe"] = dashboard_white_ui.prepare_dashboard_data(user_df)
+                    st.session_state["analysis_output"] = analysis_result
+                    st.session_state["analyzed_filename"] = uploaded_file.name
+                except Exception:
+                    clear_analysis_result()
+                    logging.getLogger(__name__).exception("Project analysis failed")
+                    st.error("We couldn't complete the analysis because of a technical problem. Please try again. If the problem continues, contact your project administrator.")
 
         if "analysis_output" in st.session_state:
-            st.subheader("Analysis Agent Output")
-            st.json(st.session_state["analysis_output"])
-
-            analysis_json = json.dumps(
-                st.session_state["analysis_output"],
-                indent=2,
-                ensure_ascii=False,
-                default=str,
-            )
-
-            st.download_button(
-                "Download Analysis JSON",
-                data=analysis_json,
-                file_name="analysis_output.json",
-                mime="application/json",
-                use_container_width=True,
-            )
+            # Existing sessions created before dashboard data was stored can
+            # use the same upload without repeating a paid analysis request.
+            if "project_dataframe" not in st.session_state:
+                st.session_state["project_dataframe"] = dashboard_white_ui.prepare_dashboard_data(read_uploaded_csv(uploaded_file))
+                st.session_state["analyzed_filename"] = uploaded_file.name
+            st.query_params["view"] = "dashboard"
+            st.rerun()
 
 
 # =========================================================
