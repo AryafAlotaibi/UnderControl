@@ -116,7 +116,7 @@ class AnalysisAgent:
         self.executor = AgentExecutor(
             agent=agent,
             tools=self.tools,
-            verbose=verbose,
+            verbose=False, #Back to True for debugging !!! Return to False for production
             handle_parsing_errors=True,
         )
 
