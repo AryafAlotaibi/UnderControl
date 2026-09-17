@@ -859,11 +859,10 @@ st.set_page_config(
 if st.query_params.get("view") == "dashboard":
     importlib.reload(dashboard_white_ui)
     dashboard_white_ui.render_dashboard_ui(
-    analysis_output=st.session_state.get("analysis_output"),
-    simulation_output=st.session_state.get("simulation_output"),
-    project_df=st.session_state.get("project_dataframe"),
-    source_name=st.session_state.get("analyzed_filename"),
-)
+        analysis_output=st.session_state.get("analysis_output"),
+        project_df=st.session_state.get("project_dataframe"),
+        source_name=st.session_state.get("analyzed_filename"),
+    )
     st.stop()
 
 

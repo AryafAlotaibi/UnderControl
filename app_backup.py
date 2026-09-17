@@ -805,12 +805,7 @@ def clear_uploaded_file():
 
 
 def clear_analysis_result():
-    for key in (
-        "analysis_output",
-        "simulation_output",
-        "project_dataframe",
-        "analyzed_filename",
-    ):
+    for key in ("analysis_output", "project_dataframe", "analyzed_filename"):
         st.session_state.pop(key, None)
     for key in ("dashboard_project", "dashboard_status", "dashboard_priority"):
         st.session_state.pop(key, None)
@@ -859,11 +854,10 @@ st.set_page_config(
 if st.query_params.get("view") == "dashboard":
     importlib.reload(dashboard_white_ui)
     dashboard_white_ui.render_dashboard_ui(
-    analysis_output=st.session_state.get("analysis_output"),
-    simulation_output=st.session_state.get("simulation_output"),
-    project_df=st.session_state.get("project_dataframe"),
-    source_name=st.session_state.get("analyzed_filename"),
-)
+        analysis_output=st.session_state.get("analysis_output"),
+        project_df=st.session_state.get("project_dataframe"),
+        source_name=st.session_state.get("analyzed_filename"),
+    )
     st.stop()
 
 
@@ -1620,48 +1614,20 @@ if uploaded_file is not None:
                         with st.spinner("Preparing analysis tools...", show_time=True):
                             from pipeline.pipeline import run_analysis
                         tools_ready = perf_counter()
-                        with st.spinner(
-                            "Analyzing the project and simulating recovery strategies. Please keep this page open...",
-                            show_time=True,
-                        ):
-                            pipeline_result = run_analysis(user_df)
+                        with st.spinner("Analyzing the project and gathering evidence. Please keep this page open...", show_time=True):
+                            analysis_result = run_analysis(user_df)
                         analysis_finished = perf_counter()
                         timing_logger = logging.getLogger("undercontrol.ui.timing")
                         timing_logger.setLevel(logging.INFO)
-                        timing_logger.info(
-                            "Analysis tools loaded in %.1fs; backend pipeline completed in %.1fs",
-                            tools_ready - started,
-                            analysis_finished - tools_ready,
-                        )
-                        analysis_status.update(
-                            label="Analysis and simulation completed. Preparing your dashboard...",
-                            state="complete",
-                            expanded=False,
-                        )
-
-                    if not isinstance(pipeline_result, dict):
-                        raise RuntimeError("No structured pipeline result was returned.")
-
-                    analysis_result = pipeline_result.get("analysis")
-                    simulation_result = pipeline_result.get("simulation")
-
+                        timing_logger.info("Analysis tools loaded in %.1fs; backend analysis completed in %.1fs",
+                                           tools_ready - started, analysis_finished - tools_ready)
+                        analysis_status.update(label="Analysis completed. Preparing your dashboard...", state="complete", expanded=False)
                     if hasattr(analysis_result, "model_dump"):
                         analysis_result = analysis_result.model_dump()
-
-                    if hasattr(simulation_result, "model_dump"):
-                        simulation_result = simulation_result.model_dump()
-
                     if not isinstance(analysis_result, dict) or not analysis_result:
                         raise RuntimeError("No structured analysis was returned.")
-
-                    if not isinstance(simulation_result, dict) or not simulation_result:
-                        raise RuntimeError("No structured simulation was returned.")
-
-                    st.session_state["project_dataframe"] = (
-                        dashboard_white_ui.prepare_dashboard_data(user_df)
-                    )
+                    st.session_state["project_dataframe"] = dashboard_white_ui.prepare_dashboard_data(user_df)
                     st.session_state["analysis_output"] = analysis_result
-                    st.session_state["simulation_output"] = simulation_result
                     st.session_state["analyzed_filename"] = uploaded_file.name
                 except Exception:
                     clear_analysis_result()

@@ -5,11 +5,10 @@ from pydantic import BaseModel, Field
 
 class Strategy(BaseModel):
     """
-    A recovery action proposed by the Simulation Agent.
+    A recovery action that can be tested by the deterministic simulator.
     """
 
     type: str
-
     description: str
 
     target_tasks: List[str] = Field(
@@ -23,8 +22,7 @@ class Strategy(BaseModel):
 
 class SimulationResult(BaseModel):
     """
-    Result returned by the deterministic simulator
-    for one recovery strategy.
+    Result returned by the deterministic simulator for one strategy.
     """
 
     strategy: Strategy
@@ -82,29 +80,41 @@ class SimulationResult(BaseModel):
 
 class StrategyComparison(BaseModel):
     """
-    Comparison used by the Simulation Agent when
-    selecting between simulated recovery strategies.
+    Comparison used when evaluating simulated recovery strategies.
     """
 
     strategy_type: str
-
     effectiveness: str
-
     feasibility: str
-
     risk: str
-
     resource_impact: str
-
     summary: str
+
+
+class RecoveryStep(BaseModel):
+    """
+    One evidence-based execution step in the final recovery order.
+
+    Multiple task IDs may appear in the same step when the available
+    dependency evidence supports progressing them in parallel.
+    """
+
+    step: int
+
+    task_ids: List[str] = Field(
+        default_factory=list
+    )
+
+    action: str
 
 
 class SimulationOutput(BaseModel):
     """
     Final structured output of the Simulation Agent.
 
-    This output is designed for direct consumption by
-    the UnderControl dashboard.
+    The output contains both:
+    1. deterministic what-if simulation results, and
+    2. an evidence-based recovery plan for the user.
     """
 
     identified_problem: str
@@ -128,6 +138,17 @@ class SimulationOutput(BaseModel):
     expected_delay_reduction: Optional[float] = None
 
     explanation: str
+
+    # Final user-facing recovery guidance. This is intentionally separate from
+    # selected_strategy because the practical recovery path may include actions
+    # outside the simulator's supported strategy types.
+    recovery_plan_summary: str = ""
+
+    recovery_execution_order: List[RecoveryStep] = Field(
+        default_factory=list
+    )
+
+    recovery_order_reason: str = ""
 
     assumptions: List[str] = Field(
         default_factory=list
