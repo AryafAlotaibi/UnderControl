@@ -1,138 +1,80 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
-class Strategy(BaseModel):
-    """
-    A recovery action proposed by the Simulation Agent.
-    """
-
-    type: str
-
+class RecoveryAction(BaseModel):
+    action_type: Literal[
+        "reassign",
+        "reprioritize",
+        "add_resource",
+        "cut_scope",
+        "extend_deadline",
+        "unblock_dependency",
+        "parallelize",
+        "other",
+    ]
     description: str
-
-    target_tasks: List[str] = Field(
-        default_factory=list
-    )
-
-    changes: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    target_tasks: List[str] = Field(default_factory=list)
+    rationale: str
 
 
-class SimulationResult(BaseModel):
-    """
-    Result returned by the deterministic simulator
-    for one recovery strategy.
-    """
+class SimulatedScenario(BaseModel):
+    scenario_name: str
 
-    strategy: Strategy
-
-    status: Literal[
-        "feasible",
-        "partially_feasible",
-        "infeasible",
+    approach_type: Literal[
+        "direct_blocker_removal",
+        "capacity_reallocation",
+        "schedule_containment",
+        "parallel_mitigation",
     ]
 
-    expected_effect: str
-
-    affected_tasks: List[str] = Field(
-        default_factory=list
-    )
-
-    modified_tasks: List[str] = Field(
-        default_factory=list
-    )
-
-    before: Dict[str, Any] = Field(
-        default_factory=dict
-    )
-
-    after: Dict[str, Any] = Field(
-        default_factory=dict
-    )
-
-    comparison: Dict[str, Any] = Field(
-        default_factory=dict
-    )
-
-    resource_impact: Literal[
-        "low",
-        "medium",
-        "high",
-        "unknown",
-    ]
-
-    risk: Literal[
-        "low",
-        "medium",
-        "high",
-        "unknown",
-    ]
-
-    assumptions: List[str] = Field(
-        default_factory=list
-    )
-
-    warnings: List[str] = Field(
-        default_factory=list
-    )
-
-
-class StrategyComparison(BaseModel):
-    """
-    Comparison used by the Simulation Agent when
-    selecting between simulated recovery strategies.
-    """
-
-    strategy_type: str
-
-    effectiveness: str
-
-    feasibility: str
-
-    risk: str
-
-    resource_impact: str
+    basis: str
 
     summary: str
 
+    actions: List[RecoveryAction] = Field(
+        default_factory=list
+    )
+
+    projected_delay_days: Optional[float] = Field(
+        default=None,
+        ge=0
+    )
+
+    projected_risk: Literal[
+        "low",
+        "medium",
+        "high"
+    ]
+
+    tradeoffs: str
+
+    supporting_evidence: List[str] = Field(
+        default_factory=list
+    )
+
+    confidence: Literal[
+        "high",
+        "medium",
+        "low"
+    ]
+
 
 class SimulationOutput(BaseModel):
-    """
-    Final structured output of the Simulation Agent.
+    baseline_summary: str
 
-    This output is designed for direct consumption by
-    the UnderControl dashboard.
-    """
-
-    identified_problem: str
-
-    candidate_strategies: List[Strategy] = Field(
+    scenarios: List[SimulatedScenario] = Field(
         default_factory=list
     )
 
-    simulated_strategies: List[SimulationResult] = Field(
-        default_factory=list
-    )
-
-    comparison: List[StrategyComparison] = Field(
-        default_factory=list
-    )
-
-    selected_strategy: Optional[Strategy] = None
-
-    selected_simulation: Optional[SimulationResult] = None
-
-    expected_delay_reduction: Optional[float] = None
-
-    explanation: str
+    recommended_scenario: Optional[str] = None
+    recommendation_rationale: Optional[str] = None
 
     assumptions: List[str] = Field(
         default_factory=list
     )
 
-    warnings: List[str] = Field(
+    data_warnings: List[str] = Field(
         default_factory=list
     )

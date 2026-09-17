@@ -4,102 +4,139 @@ from langchain_classic.agents import (
     create_react_agent,
     AgentExecutor,
 )
-
 from langchain_classic.tools import tool
 
-from schemas.analysis_output import AnalysisOutput
 from schemas.simulation_output import SimulationOutput
 
-from simulation.simulator import (
-    simulate_strategy_core,
-)
-
 
 # =========================================================
-# 1. Simulation Tool
+# 1. Core Functions
 # =========================================================
 
-def build_simulate_strategy_tool(project_df):
+def get_analysis_summary_core(analysis_output: dict) -> str:
     """
-    Build the deterministic simulation tool for the
-    current project.
+    Return the Analysis Agent's diagnosis as readable JSON.
+    """
+
+    if not isinstance(analysis_output, dict):
+        raise TypeError(
+            "analysis_output must be a dictionary."
+        )
+
+    if not analysis_output:
+        raise ValueError(
+            "Analysis output is not available."
+        )
+
+    return json.dumps(
+        analysis_output,
+        indent=2,
+        ensure_ascii=False,
+        default=str,
+    )
+
+
+def get_project_metrics_core(project_metrics: dict) -> str:
+    """
+    Return deterministic project metrics calculated
+    by ProjectAnalyzer as readable JSON.
+    """
+
+    if not isinstance(project_metrics, dict):
+        raise TypeError(
+            "project_metrics must be a dictionary."
+        )
+
+    if not project_metrics:
+        raise ValueError(
+            "Project metrics are not available."
+        )
+
+    return json.dumps(
+        project_metrics,
+        indent=2,
+        ensure_ascii=False,
+        default=str,
+    )
+
+
+# =========================================================
+# 2. Tools
+# =========================================================
+
+def build_analysis_summary_tool(analysis_output: dict):
+    """
+    Create a tool exposing the Analysis Agent's diagnosis
+    for the current simulation run.
     """
 
     @tool
-    def simulate_strategy(
-        strategy: str,
-    ) -> str:
+    def get_analysis_summary(query: str = "all") -> str:
         """
-        Evaluate a proposed recovery strategy against
-        a copy of the current project state.
-
-        The strategy must be a JSON object.
+        Return the Analysis Agent's diagnosis for the current
+        project: project state, root cause, bottlenecks,
+        dependencies, critical tasks, schedule and workload
+        signals, confidence, and data warnings.
         """
+        return get_analysis_summary_core(analysis_output)
 
-        try:
-            payload = json.loads(strategy)
+    return get_analysis_summary
 
-        except (
-            json.JSONDecodeError,
-            TypeError,
-        ):
-            raise ValueError(
-                "strategy must be a valid JSON object."
-            )
 
-        if not isinstance(payload, dict):
-            raise ValueError(
-                "strategy must be a JSON object."
-            )
+def build_project_metrics_tool(project_metrics: dict):
+    """
+    Create a project metrics tool for the current simulation run.
+    """
 
-        result = simulate_strategy_core(
-            project_df=project_df,
-            strategy=payload,
-        )
+    @tool
+    def get_project_metrics(query: str = "all") -> str:
+        """
+        Return calculated metrics and statistical signals for the
+        current project, including issue counts, statuses, priorities,
+        timing, workload, and dependency statistics when available.
+        """
+        return get_project_metrics_core(project_metrics)
 
-        return json.dumps(
-            result,
-            indent=2,
-            ensure_ascii=False,
-            default=str,
-        )
-
-    return simulate_strategy
+    return get_project_metrics
 
 
 # =========================================================
-# 2. Tool Registry
+# 3. Tool Registry
 # =========================================================
 
 def build_simulation_tools(
-    project_df,
+    analysis_output: dict,
+    project_metrics: dict,
     live_rag_tool=None,
+    ground_truth_rag_tool=None,
 ):
     """
-    Build the tools available to the Simulation Agent.
+    Build the tools available to the Simulation Agent
+    for the current project run.
     """
 
     tools = [
-        build_simulate_strategy_tool(
-            project_df
-        )
+        build_analysis_summary_tool(analysis_output),
+        build_project_metrics_tool(project_metrics),
     ]
 
     if live_rag_tool is not None:
-        tools.append(
-            live_rag_tool
-        )
+        tools.append(live_rag_tool)
+
+    if ground_truth_rag_tool is not None:
+        tools.append(ground_truth_rag_tool)
 
     return tools
 
+
 # =========================================================
-# 3. Simulation Agent
+# 4. Simulation Agent
 # =========================================================
 
 class SimulationAgent:
     """
-    Generates, simulates, compares, and selects
-    recovery actions based on the Analysis Agent diagnosis.
+    Propose and evaluate recovery scenarios for the current
+    project, grounded in the Analysis Agent's diagnosis.
     """
 
     def __init__(
@@ -107,34 +144,11 @@ class SimulationAgent:
         llm,
         prompt,
         tools,
-        analysis_output,
         verbose=False,
     ):
         self.llm = llm
         self.prompt = prompt
         self.tools = tools
-
-        if isinstance(
-            analysis_output,
-            AnalysisOutput,
-        ):
-            self.analysis_output = analysis_output
-
-        elif isinstance(
-            analysis_output,
-            dict,
-        ):
-            self.analysis_output = (
-                AnalysisOutput.model_validate(
-                    analysis_output
-                )
-            )
-
-        else:
-            raise TypeError(
-                "analysis_output must be an "
-                "AnalysisOutput object or dictionary."
-            )
 
         agent = create_react_agent(
             llm=self.llm,
@@ -148,80 +162,35 @@ class SimulationAgent:
             tools=self.tools,
             verbose=verbose,
             handle_parsing_errors=True,
-            max_iterations=6,
-            early_stopping_method="force",
-
-
         )
 
-        def simulate(self) -> dict:
-            """
-            Generate and evaluate recovery strategies
-            using the AnalysisOutput as the starting diagnosis.
-            """
-
-            analysis_json = (
-                self.analysis_output.model_dump_json(
-                    indent=2
-                )
-            )
-
-            result = self.executor.invoke(
-                {
-                    "input": (
-                        "Use the AnalysisOutput below as the "
-                        "starting diagnosis.\n\n"
-
-                        "AnalysisOutput:\n"
-                        f"{analysis_json}\n\n"
-
-                        "Your task is to determine what actions "
-                        "the project manager can take to address "
-                        "the diagnosed problem.\n\n"
-
-                        "Generate 2 to 4 plausible recovery "
-                        "strategies based only on supported "
-                        "current-project evidence.\n\n"
-
-                        "Use search_live_project only when the "
-                        "AnalysisOutput does not contain enough "
-                        "current-project detail to construct or "
-                        "evaluate a strategy.\n\n"
-
-                        "Use simulate_strategy to evaluate every "
-                        "strategy that you intend to compare or "
-                        "select.\n\n"
-
-                        "Never invent simulation results. "
-                        "All BEFORE, AFTER, comparison, affected "
-                        "tasks, and modified tasks information "
-                        "must come from simulate_strategy.\n\n"
-
-                        "Do not invent productivity, resource "
-                        "capacity, hiring time, onboarding time, "
-                        "cost, completion dates, days saved, or "
-                        "delay reduction unless they are explicitly "
-                        "supported by the simulator output.\n\n"
-
-                        "If expected delay reduction cannot be "
-                        "calculated reliably, set it to null and "
-                        "explain the limitation in warnings.\n"
-                    )
-                }
-            )
-
-            raw_output = result["output"]
-
-            return self._validate_output(
-                raw_output
-            )
-
-    def _validate_output(
-        self,
-        raw_output: str,
-    ) -> dict:
+    def simulate(self) -> dict:
         """
-        Validate the final SimulationOutput.
+        Run the recovery simulation and return validated
+        structured scenarios.
+        """
+
+        result = self.executor.invoke({
+            "input": (
+                "Using the Analysis Agent's diagnosis, propose and "
+                "evaluate recovery scenarios for this project. "
+                "Determine the recovery actions, projected delay "
+                "impact when supportable, risk, tradeoffs, "
+                "supporting evidence, confidence, a recommended "
+                "scenario when warranted, assumptions, and data "
+                "warnings. Do not invent unsupported information "
+                "and do not ask the user for missing data."
+            )
+        })
+
+        raw_output = result["output"]
+
+        return self._validate_output(raw_output)
+
+    def _validate_output(self, raw_output: str) -> dict:
+        """
+        Validate the final Simulation Agent JSON
+        using the SimulationOutput schema.
         """
 
         if not raw_output:
@@ -231,29 +200,19 @@ class SimulationAgent:
 
         cleaned_output = raw_output.strip()
 
-        if cleaned_output.startswith(
-            "```json"
-        ):
+        if cleaned_output.startswith("```json"):
             cleaned_output = cleaned_output[7:]
 
-        elif cleaned_output.startswith(
-            "```"
-        ):
+        elif cleaned_output.startswith("```"):
             cleaned_output = cleaned_output[3:]
 
-        if cleaned_output.endswith(
-            "```"
-        ):
-            cleaned_output = (
-                cleaned_output[:-3]
-            )
+        if cleaned_output.endswith("```"):
+            cleaned_output = cleaned_output[:-3]
 
         cleaned_output = cleaned_output.strip()
 
-        simulation = (
-            SimulationOutput.model_validate_json(
-                cleaned_output
-            )
+        simulation = SimulationOutput.model_validate_json(
+            cleaned_output
         )
 
         return simulation.model_dump()

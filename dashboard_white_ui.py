@@ -3,8 +3,6 @@ import html
 import pandas as pd
 import streamlit as st
 
-from analysis.project_analyzer import ProjectAnalyzer
-
 
 # These aliases are only for displaying the uploaded table. The backend continues
 # to receive the original dataframe and keeps its own schema mapping unchanged.
@@ -62,6 +60,35 @@ def display_values(df, field):
     return df[field].astype("string").str.strip().where(populated(df, field), "Not provided")
 
 
+RISK_PILL_STYLES = {
+    "low": ("#15803D", "#ECFDF5", "#A7F3D0"),
+    "medium": ("#B45309", "#FFFBEB", "#FDE68A"),
+    "high": ("#B91C1C", "#FEF2F2", "#FECACA"),
+}
+CONFIDENCE_PILL_STYLES = {
+    "high": ("#1D4ED8", "#EFF6FF", "#BFDBFE"),
+    "medium": ("#6D28D9", "#F5F3FF", "#DDD6FE"),
+    "low": ("#475569", "#F1F5F9", "#E2E8F0"),
+}
+DEFAULT_PILL_STYLE = ("#475569", "#F1F5F9", "#E2E8F0")
+
+APPROACH_LABELS = {
+    "direct_blocker_removal": "Direct blocker removal",
+    "capacity_reallocation": "Capacity reallocation",
+    "schedule_containment": "Schedule containment",
+    "parallel_mitigation": "Parallel mitigation",
+}
+
+
+def _pill(label, value, styles):
+    fg, bg, border = styles.get(str(value).lower(), DEFAULT_PILL_STYLE)
+    text = f"{label}: {str(value).title()}"
+    return (
+        f'<span class="sim-pill" style="color:{fg};background:{bg};border-color:{border}">'
+        f'{html.escape(text)}</span>'
+    )
+
+
 def metric_card(label, value, note):
     unavailable = value is None or (isinstance(value, float) and pd.isna(value))
     value_text = "Not available" if unavailable else str(value)
@@ -104,7 +131,7 @@ def render_distribution(frame, field, title, color):
         st.vega_lite_chart(counts, chart, width="stretch", theme=None, key=f"distribution_{field}")
 
 
-def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=None, source_name=None) -> None:
+def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df=None, project_metrics=None, source_name=None) -> None:
     """Display real uploaded task data and the unchanged backend analysis result."""
     st.markdown(
         """
@@ -180,6 +207,46 @@ def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=N
     .control-label::before { content:""; width:22px; height:1px; background:#A9C4EE; }
     .stat-card { border-top:3px solid transparent; background:linear-gradient(#FFF,#FFF) padding-box,linear-gradient(90deg,#4B88F5,#8B5CF6,#2DD4BF) border-box; }
     .widget:first-child { border-top:3px solid #4E8CF6; }
+    div[data-testid="stExpander"] { background:#FFFFFF; border:1px solid #E5ECF7 !important; border-radius:14px; overflow:hidden; margin-bottom:10px; }
+    div[data-testid="stExpander"] summary { background:#F8FAFF !important; padding:12px 16px !important; }
+    div[data-testid="stExpander"] summary span, div[data-testid="stExpander"] summary p { color:#182641 !important; font-weight:650 !important; }
+    div[data-testid="stExpander"] summary svg { color:#5C78AC !important; fill:#5C78AC !important; }
+    div[data-testid="stExpander"] div[data-testid="stExpanderDetails"] { padding:14px 16px 16px; }
+    .sim-intro { padding:16px 18px; margin:4px 0 20px; background:linear-gradient(90deg,#F5F9FF,#FFFFFF); border:1px solid #E1EAF7; border-left:4px solid #4B88F5; border-radius:14px; color:#334463; font-size:13.5px; line-height:1.65; }
+    .scenario-card { position:relative; background:#FFFFFF; border:1px solid #E5ECF7; border-left:5px solid #94A3B8; border-radius:16px; padding:18px 20px; margin-bottom:16px; box-shadow:0 10px 24px rgba(27,55,97,.045); }
+    .scenario-card.recommended { border-left-color:#2DD4BF; box-shadow:0 14px 30px rgba(45,212,191,.16); }
+    .scenario-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+    .scenario-name { color:#16223B; font-size:16px; font-weight:780; letter-spacing:-.02em; }
+    .scenario-name .star { color:#F59E0B; margin-right:6px; }
+    .scenario-approach { display:inline-block; margin-top:4px; color:#5C78AC; font-size:10.5px; font-weight:750; letter-spacing:.03em; text-transform:uppercase; }
+    .scenario-pills { display:flex; gap:6px; flex-wrap:wrap; }
+    .sim-pill { display:inline-flex; align-items:center; padding:3px 9px; border-radius:99px; font-size:10.5px; font-weight:750; border:1px solid; white-space:nowrap; }
+    .scenario-basis { display:flex; gap:7px; align-items:flex-start; margin:10px 0 4px; padding:8px 11px; background:#F5F9FF; border:1px solid #DCE8FB; border-radius:10px; }
+    .scenario-basis .basis-label { flex:0 0 auto; color:#2854AD; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+    .scenario-basis .basis-text { color:#3C567F; font-size:12px; line-height:1.5; }
+    .scenario-summary { color:#425068; font-size:13.5px; line-height:1.6; margin:6px 0 14px; }
+    .scenario-actions-title { color:#8492AD; font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; margin-bottom:8px; }
+    .action-row { display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-top:1px solid #F0F4FA; }
+    .action-row:first-of-type { border-top:none; }
+    .action-tag { flex:0 0 auto; margin-top:1px; padding:3px 8px; background:#EEF2FF; color:#4338CA; border-radius:7px; font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; }
+    .action-body { flex:1; min-width:0; }
+    .action-desc { color:#334463; font-size:13px; line-height:1.55; }
+    .action-targets { color:#8DA0BC; font-size:11px; margin-top:2px; }
+    .scenario-tradeoffs { margin-top:14px; padding:11px 14px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:11px; }
+    .scenario-tradeoffs strong { color:#92400E; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    .scenario-tradeoffs p { margin:5px 0 0; color:#78460D; font-size:12.5px; line-height:1.55; }
+    .scenario-card details { margin-top:12px; }
+    .scenario-card summary { cursor:pointer; color:#5C78AC; font-size:11.5px; font-weight:750; list-style:none; }
+    .scenario-card summary::-webkit-details-marker { display:none; }
+    .scenario-card summary::before { content:"▸ "; }
+    .scenario-card details[open] summary::before { content:"▾ "; }
+    .scenario-evidence { margin:8px 0 0; padding-left:0; list-style:none; }
+    .scenario-evidence li { color:#6C7B96; font-size:12px; line-height:1.6; padding-left:14px; position:relative; margin-bottom:4px; }
+    .scenario-evidence li::before { content:"•"; position:absolute; left:0; color:#B7C6E0; }
+    .recommend-banner { display:flex; align-items:flex-start; gap:12px; margin:6px 0 18px; padding:16px 18px; background:linear-gradient(120deg,#ECFDF5,#F0FDFA); border:1px solid #A7F3D0; border-radius:16px; }
+    .recommend-banner .rb-icon { flex:0 0 auto; width:34px; height:34px; display:grid; place-items:center; background:#16A34A; color:#FFF; border-radius:10px; font-size:16px; }
+    .recommend-banner .rb-content strong { display:block; color:#065F46; font-size:13px; margin-bottom:3px; }
+    .recommend-banner .rb-content span { color:#0F766E; font-size:12.5px; line-height:1.6; }
     @media(max-width:760px) { .command-deck { grid-template-columns:minmax(0,1fr) 150px; } .signal-orbit { display:block; transform:scale(.74); transform-origin:right center; } .command-copy { padding:25px; } }
     @media(max-width:580px) { .command-deck { grid-template-columns:1fr; } .signal-orbit { display:none; } }
     @media(max-width:760px) { .block-container { padding:20px 18px 52px; } .dashboard-title { font-size:26px; } .issue-head,.issue-row { grid-template-columns:1.15fr .9fr .9fr; } .issue-head > :nth-child(n+4),.issue-row > :nth-child(n+4) { display:none; } }
@@ -189,7 +256,7 @@ def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=N
     )
 
     if st.button("← Upload another file", key="dashboard_back"):
-        for key in ("analysis_output", "project_dataframe", "project_metrics", "analyzed_filename"):
+        for key in ("analysis_output", "simulation_output", "project_dataframe", "project_metrics", "analyzed_filename"):
             st.session_state.pop(key, None)
         st.session_state["uploader_version"] = st.session_state.get("uploader_version", 0) + 1
         for key in ("dashboard_project", "dashboard_status", "dashboard_priority"):
@@ -266,38 +333,24 @@ def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=N
     if len(filtered) == 0:
         st.info("No tasks match these filters. Choose All to broaden your selection.")
     else:
-        metrics = ProjectAnalyzer().prepare_project(filtered)["metrics"]
-        known_resolution = any(populated(filtered, c).any() for c in ("status", "resolution", "resolution_date"))
-        resolution = metrics.get("average_resolution_time_minutes")
-        points = pd.to_numeric(filtered["story_point"], errors="coerce") if "story_point" in filtered else pd.Series(dtype=float)
-        point_total = points.sum(min_count=1)
-        stats = [
-            ("Total issues", len(filtered), "Tasks matching your filters"),
-            ("Resolved work", metrics.get("resolved_issues") if known_resolution else None, "Known completion signals"),
-            ("Avg. resolution time", None if resolution is None else f"{resolution:,.0f} min", "Recorded resolution duration"),
-            ("Story points", None if pd.isna(point_total) else f"{point_total:,.1f}", "Sum of available estimates"),
-        ]
-        for column, (label, value, note) in zip(st.columns(4), stats):
-            with column:
-                metric_card(label, value, note)
+        st.caption(f"{len(filtered):,} tasks match your filters")
         for container, field, title, color in zip(st.columns(2), ("status", "priority"), ("Issue status", "Priority mix"), ("#4B88F5", "#8B5CF6")):
             with container:
                 render_distribution(filtered, field, title, color)
-        for container, field, title, color in zip(st.columns(2), ("type", "assignee_id"), ("Issue types", "Tasks per assignee"), ("#20BDAA", "#4B88F5")):
-            with container:
-                render_distribution(filtered, field, title, color)
-        st.markdown('<div class="section-name">Issue register</div>', unsafe_allow_html=True)
+        render_distribution(filtered, "assignee_id", "Tasks per assignee", "#4B88F5")
+
         labels = {"issue_key": "Issue", "issue_id": "ID", "text": "Task details", "type": "Type", "priority": "Priority", "status": "Status", "assignee_id": "Assignee", "creation_date": "Created", "due_date": "Due", "resolution_date": "Resolved", "story_point": "Story points"}
         columns = [c for c in labels if c in filtered and populated(filtered, c).any()]
-        if columns:
-            date_columns = {
-                labels[c]: st.column_config.DatetimeColumn(labels[c], format="YYYY-MM-DD")
-                for c in ("creation_date", "due_date", "resolution_date") if c in columns
-            }
-            st.dataframe(filtered[columns].rename(columns=labels), hide_index=True,
-                         width="stretch", column_config=date_columns)
-        else:
-            st.info("Task details cannot be displayed with the column names supplied in this file.")
+        with st.expander(f"View full issue register ({len(filtered):,} tasks)"):
+            if columns:
+                date_columns = {
+                    labels[c]: st.column_config.DatetimeColumn(labels[c], format="YYYY-MM-DD")
+                    for c in ("creation_date", "due_date", "resolution_date") if c in columns
+                }
+                st.dataframe(filtered[columns].rename(columns=labels), hide_index=True,
+                             width="stretch", column_config=date_columns)
+            else:
+                st.info("Task details cannot be displayed with the column names supplied in this file.")
 
     st.markdown('<div class="section-name">Analysis findings · full upload</div>', unsafe_allow_html=True)
     root = analysis_output.get("root_cause")
@@ -314,7 +367,7 @@ def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=N
         else:
             st.info("Not provided by the Analysis Agent.")
 
-    tabs = st.tabs(["Bottlenecks", "Critical tasks", "Dependencies", "Workload", "Evidence"])
+    tabs = st.tabs(["Bottlenecks", "Critical tasks", "Dependencies", "Workload"])
     with tabs[0]:
         rows = analysis_output.get("bottlenecks") or []
         if not rows:
@@ -368,10 +421,109 @@ def render_dashboard_ui(analysis_output=None, project_df=None, project_metrics=N
                 st.write("Issue: " + (item.get("issue") or "Not provided by the Analysis Agent."))
                 related = item.get("related_tasks") or []
                 st.write("Related tasks: " + (", ".join(map(str, related)) if related else "Not provided by the Analysis Agent."))
-    with tabs[4]:
-        rows = analysis_output.get("evidence") or []
-        if rows:
-            for item in rows:
-                st.write(f"• {item}")
-        else:
-            st.info("Not provided by the Analysis Agent.")
+
+    st.markdown('<div class="section-name">Recovery scenarios · Simulation Agent</div>', unsafe_allow_html=True)
+    if not simulation_output:
+        st.info("No simulation is available in this session.")
+    else:
+        baseline = simulation_output.get("baseline_summary")
+        if baseline:
+            st.markdown(f'<div class="sim-intro">{html.escape(baseline)}</div>', unsafe_allow_html=True)
+
+        recommended = simulation_output.get("recommended_scenario")
+        scenarios = simulation_output.get("scenarios") or []
+
+        if not scenarios:
+            st.info("Not provided by the Simulation Agent.")
+
+        for scenario in scenarios:
+            name = scenario.get("scenario_name") or "Scenario"
+            is_recommended = bool(recommended) and name == recommended
+
+            pills = ""
+            risk = scenario.get("projected_risk")
+            if risk:
+                pills += _pill("Risk", risk, RISK_PILL_STYLES)
+            confidence = scenario.get("confidence")
+            if confidence:
+                pills += _pill("Confidence", confidence, CONFIDENCE_PILL_STYLES)
+            delay = scenario.get("projected_delay_days")
+            if delay is not None:
+                pills += _pill("Delay change", f"{delay:g} days", {})
+
+            actions_html = ""
+            for action in scenario.get("actions") or []:
+                targets = ", ".join(action.get("target_tasks") or []) or "Not specified"
+                action_type = action.get("action_type") or "action"
+                description = action.get("description") or ""
+                actions_html += (
+                    '<div class="action-row">'
+                    f'<span class="action-tag">{html.escape(action_type)}</span>'
+                    '<div class="action-body">'
+                    f'<div class="action-desc">{html.escape(description)}</div>'
+                    f'<div class="action-targets">Targets: {html.escape(targets)}</div>'
+                    '</div></div>'
+                )
+
+            evidence_html = ""
+            evidence = scenario.get("supporting_evidence") or []
+            if evidence:
+                items = "".join(f"<li>{html.escape(str(item))}</li>" for item in evidence)
+                evidence_html = f'<details><summary>Supporting evidence</summary><ul class="scenario-evidence">{items}</ul></details>'
+
+            summary = scenario.get("summary") or ""
+            tradeoffs = scenario.get("tradeoffs") or "Not provided by the Simulation Agent."
+            star = '<span class="star">⭐</span>' if is_recommended else ""
+            card_class = "scenario-card recommended" if is_recommended else "scenario-card"
+            approach_label = APPROACH_LABELS.get(scenario.get("approach_type"), "")
+            approach_html = f'<div class="scenario-approach">{html.escape(approach_label)}</div>' if approach_label else ""
+            basis = scenario.get("basis")
+            basis_html = (
+                '<div class="scenario-basis"><span class="basis-label">Grounded in</span>'
+                f'<span class="basis-text">{html.escape(basis)}</span></div>'
+                if basis else ""
+            )
+
+            st.markdown(
+                f'<div class="{card_class}">'
+                '<div class="scenario-card-head">'
+                f'<div><div class="scenario-name">{star}{html.escape(name)}</div>{approach_html}</div>'
+                f'<div class="scenario-pills">{pills}</div>'
+                '</div>'
+                + basis_html
+                + f'<div class="scenario-summary">{html.escape(summary)}</div>'
+                + (
+                    '<div class="scenario-actions-title">Recovery actions</div>'
+                    f'<div class="scenario-actions">{actions_html}</div>'
+                    if actions_html else ""
+                )
+                + '<div class="scenario-tradeoffs"><strong>Tradeoffs</strong>'
+                f'<p>{html.escape(tradeoffs)}</p></div>'
+                + evidence_html
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+
+        if recommended:
+            rationale = simulation_output.get("recommendation_rationale") or ""
+            st.markdown(
+                '<div class="recommend-banner">'
+                '<div class="rb-icon">✓</div>'
+                '<div class="rb-content">'
+                f'<strong>Recommended scenario: {html.escape(recommended)}</strong>'
+                f'<span>{html.escape(rationale)}</span>'
+                '</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        assumptions = simulation_output.get("assumptions") or []
+        if assumptions:
+            with st.expander("Assumptions behind these scenarios"):
+                for item in assumptions:
+                    st.write(f"• {item}")
+
+        sim_warnings = simulation_output.get("data_warnings") or []
+        if sim_warnings:
+            with st.expander("Simulation Agent data warnings"):
+                for item in sim_warnings:
+                    st.write(f"• {item}")

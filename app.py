@@ -1,4 +1,3 @@
-
 # import html
 # import importlib
 
@@ -805,7 +804,7 @@ def clear_uploaded_file():
 
 
 def clear_analysis_result():
-    for key in ("analysis_output", "project_dataframe", "analyzed_filename"):
+    for key in ("analysis_output", "simulation_output", "project_dataframe", "analyzed_filename"):
         st.session_state.pop(key, None)
     for key in ("dashboard_project", "dashboard_status", "dashboard_priority"):
         st.session_state.pop(key, None)
@@ -855,6 +854,7 @@ if st.query_params.get("view") == "dashboard":
     importlib.reload(dashboard_white_ui)
     dashboard_white_ui.render_dashboard_ui(
         analysis_output=st.session_state.get("analysis_output"),
+        simulation_output=st.session_state.get("simulation_output"),
         project_df=st.session_state.get("project_dataframe"),
         source_name=st.session_state.get("analyzed_filename"),
     )
@@ -1626,8 +1626,13 @@ if uploaded_file is not None:
                         analysis_result = analysis_result.model_dump()
                     if not isinstance(analysis_result, dict) or not analysis_result:
                         raise RuntimeError("No structured analysis was returned.")
+                    # run_analysis() returns {"analysis": ..., "simulation": ...};
+                    # the dashboard only knows how to render the analysis half.
+                    analysis_output = analysis_result.get("analysis", analysis_result)
+                    simulation_output = analysis_result.get("simulation")
                     st.session_state["project_dataframe"] = dashboard_white_ui.prepare_dashboard_data(user_df)
-                    st.session_state["analysis_output"] = analysis_result
+                    st.session_state["analysis_output"] = analysis_output
+                    st.session_state["simulation_output"] = simulation_output
                     st.session_state["analyzed_filename"] = uploaded_file.name
                 except Exception:
                     clear_analysis_result()

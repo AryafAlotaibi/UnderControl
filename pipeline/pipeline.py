@@ -23,6 +23,13 @@ Flow:
     + Ground Truth Retriever
         -> Analysis Agent
         -> AnalysisOutput
+
+    AnalysisOutput
+    + Project Metrics
+    + Live RAG Retriever
+    + Ground Truth Retriever
+        -> Simulation Agent
+        -> SimulationOutput
 """
 
 from preprocessing.schema_mapper import SchemaMapper
@@ -39,8 +46,13 @@ from agents.analysis_agent import (
     AnalysisAgent,
     build_analysis_tools,
 )
+from agents.simulation_agent import (
+    SimulationAgent,
+    build_simulation_tools,
+)
 
 from prompts.analysis_prompt import analysis_prompt
+from prompts.simulation_prompt import simulation_prompt
 from llm.model import create_agent_llm
 
 
@@ -85,11 +97,35 @@ def run_analysis(user_df):
     )
 
     # 6. Create and run Analysis Agent
-    agent = AnalysisAgent(
+    analysis_agent = AnalysisAgent(
         llm=create_agent_llm(),
         prompt=analysis_prompt,
         tools=tools,
         verbose=True,
     )
 
-    return agent.analyze()
+    analysis_output = analysis_agent.analyze()
+
+    # 7. Give the diagnosis + metrics + live/ground-truth RAG to the
+    #    Simulation Agent
+    simulation_tools = build_simulation_tools(
+        analysis_output=analysis_output,
+        project_metrics=project_metrics,
+        live_rag_tool=live_rag_tool,
+        ground_truth_rag_tool=ground_truth_rag_tool,
+    )
+
+    # 8. Create and run Simulation Agent
+    simulation_agent = SimulationAgent(
+        llm=create_agent_llm(),
+        prompt=simulation_prompt,
+        tools=simulation_tools,
+        verbose=True,
+    )
+
+    simulation_output = simulation_agent.simulate()
+
+    return {
+        "analysis": analysis_output,
+        "simulation": simulation_output,
+    }

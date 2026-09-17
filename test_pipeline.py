@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 
 from pipeline.pipeline import run_analysis
@@ -44,4 +46,7 @@ df = pd.DataFrame([
 result = run_analysis(df)
 
 print("\n--- Analysis Result ---")
-print(result)
+print(json.dumps(result["analysis"], indent=2, ensure_ascii=False))
+
+print("\n--- Simulation Result ---")
+print(json.dumps(result["simulation"], indent=2, ensure_ascii=False))
