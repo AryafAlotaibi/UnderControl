@@ -378,21 +378,23 @@ class SchemaMapper:
             column_samples=schema_info["column_samples"]
         )
 
-        response = self.client.responses.create(
+        response = self.client.chat.completions.create(
             model=self.model,
-            input=prompt,
-            reasoning={
-                "effort": "low"
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            response_format={
+                "type": "json_object"
             },
-            text={
-                "format": {
-                    "type": "json_object"
+            extra_body={
+                "reasoning": {
+                    "effort": "low"
                 }
             }
         )
 
         result = json.loads(
-            response.output_text
+            response.choices[0].message.content
         )
 
         raw_mapping = result.get(

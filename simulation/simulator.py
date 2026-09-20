@@ -22,7 +22,6 @@ def _calculate_metrics(df: pd.DataFrame) -> dict:
     """
 
     analyzer = ProjectAnalyzer()
-
     prepared = analyzer.prepare_project(df)
 
     return prepared["metrics"]
@@ -71,7 +70,6 @@ def _ensure_column(
     df: pd.DataFrame,
     column: str,
 ) -> None:
-
     if column not in df.columns:
         raise SimulationError(
             f"Required project column '{column}' is not available."
@@ -82,7 +80,6 @@ def _get_target_tasks(
     df: pd.DataFrame,
     strategy: dict,
 ) -> list[str]:
-
     _ensure_column(df, "issue_key")
 
     target_tasks = strategy.get(
@@ -136,7 +133,6 @@ def _apply_resource_reassignment(
     df: pd.DataFrame,
     strategy: dict,
 ) -> list[str]:
-
     _ensure_column(df, "issue_key")
     _ensure_column(df, "assignee_id")
 
@@ -170,7 +166,7 @@ def _apply_resource_reassignment(
             "resource_reassignment requires "
             "'changes.assignee_id.to'."
         )
-    
+
     new_assignee = str(
         new_assignee
     ).strip()
@@ -196,24 +192,36 @@ def _apply_resource_reassignment(
     mask = df["issue_key"].astype(str).isin(
         target_tasks
     )
-    current_values = (
-    df.loc[mask, "assignee_id"]
-    .astype(str)
-    .str.strip()
-)
 
-    if (current_values == new_assignee).all():
-        raise SimulationError(
-        "The strategy does not change the assignee of the target task(s)."
+    current_values = (
+        df.loc[mask, "assignee_id"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
     )
-    
+
+    changed_index = current_values[
+        current_values != new_assignee
+    ].index
+
+    if len(changed_index) == 0:
+        raise SimulationError(
+            "The strategy does not change the assignee "
+            "of the target task(s)."
+        )
 
     df.loc[
-        mask,
+        changed_index,
         "assignee_id"
     ] = new_assignee
 
-    return target_tasks
+    modified_tasks = (
+        df.loc[changed_index, "issue_key"]
+        .astype(str)
+        .tolist()
+    )
+
+    return modified_tasks
 
 
 # =========================================================
@@ -224,7 +232,6 @@ def _apply_reprioritization(
     df: pd.DataFrame,
     strategy: dict,
 ) -> list[str]:
-
     _ensure_column(df, "issue_key")
     _ensure_column(df, "priority")
 
@@ -270,27 +277,52 @@ def _apply_reprioritization(
             "New priority cannot be empty."
         )
 
+    existing_priorities = set(
+        df["priority"]
+        .dropna()
+        .astype(str)
+        .str.strip()
+    )
+
+    if new_priority not in existing_priorities:
+        raise SimulationError(
+            f"Target priority '{new_priority}' "
+            "does not exist in the current project."
+        )
+
     mask = df["issue_key"].astype(str).isin(
         target_tasks
     )
 
-    
     current_values = (
-    df.loc[mask, "priority"]
-    .astype(str)
-    .str.strip()
-)
-
-    if (current_values == new_priority).all():
-       raise SimulationError(
-        "The strategy does not change the priority of the target task(s)."
+        df.loc[mask, "priority"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
     )
+
+    changed_index = current_values[
+        current_values != new_priority
+    ].index
+
+    if len(changed_index) == 0:
+        raise SimulationError(
+            "The strategy does not change the priority "
+            "of the target task(s)."
+        )
+
     df.loc[
-        mask,
+        changed_index,
         "priority"
     ] = new_priority
 
-    return target_tasks
+    modified_tasks = (
+        df.loc[changed_index, "issue_key"]
+        .astype(str)
+        .tolist()
+    )
+
+    return modified_tasks
 
 
 # =========================================================
@@ -301,7 +333,6 @@ def _apply_dependency_resolution(
     df: pd.DataFrame,
     strategy: dict,
 ) -> list[str]:
-
     _ensure_column(df, "issue_key")
 
     if "dependency" not in df.columns:
@@ -346,22 +377,43 @@ def _apply_dependency_resolution(
     mask = df["issue_key"].astype(str).isin(
         target_tasks
     )
-    current_dependencies = df.loc[
-    mask,
-    "dependency"
-]
 
-    if current_dependencies.isna().all():
-        raise SimulationError(
-        "The target task(s) do not have a dependency to remove."
+    current_dependencies = df.loc[
+        mask,
+        "dependency"
+    ]
+
+    has_dependency = (
+        current_dependencies.notna()
+        & current_dependencies
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .ne("")
     )
 
+    changed_index = current_dependencies[
+        has_dependency
+    ].index
+
+    if len(changed_index) == 0:
+        raise SimulationError(
+            "The target task(s) do not have "
+            "a dependency to remove."
+        )
+
     df.loc[
-        mask,
+        changed_index,
         "dependency"
     ] = None
 
-    return target_tasks
+    modified_tasks = (
+        df.loc[changed_index, "issue_key"]
+        .astype(str)
+        .tolist()
+    )
+
+    return modified_tasks
 
 
 # =========================================================
@@ -372,7 +424,6 @@ def _apply_strategy(
     df: pd.DataFrame,
     strategy: dict,
 ) -> list[str]:
-
     strategy_type = strategy["type"]
 
     if strategy_type == "resource_reassignment":
@@ -406,7 +457,6 @@ def _compare_metrics(
     before: dict,
     after: dict,
 ) -> dict:
-
     comparison: Dict[str, Any] = {}
 
     # -------------------------
@@ -430,7 +480,6 @@ def _compare_metrics(
         "blocked_tasks",
         "unfinished_high_priority_tasks",
     ):
-
         before_value = before_schedule.get(
             key
         )
@@ -476,7 +525,6 @@ def _compare_metrics(
     workload_changes = {}
 
     for assignee in all_assignees:
-
         before_count = int(
             before_workload.get(
                 assignee,
@@ -492,7 +540,6 @@ def _compare_metrics(
         )
 
         if before_count != after_count:
-
             workload_changes[assignee] = {
                 "before": before_count,
                 "after": after_count,
@@ -519,7 +566,6 @@ def _compare_metrics(
         before_dependencies is not None
         and after_dependencies is not None
     ):
-
         comparison["dependency_count"] = {
             "before": before_dependencies,
             "after": after_dependencies,
@@ -555,21 +601,27 @@ def simulate_strategy_core(
     project_df: pd.DataFrame,
     strategy: dict,
 ) -> dict:
-
-    if not isinstance(project_df, pd.DataFrame):
+    if not isinstance(
+        project_df,
+        pd.DataFrame,
+    ):
         raise TypeError(
             "project_df must be a pandas DataFrame."
         )
 
     _validate_strategy(strategy)
 
-    before_df = project_df.copy(deep=True)
+    before_df = project_df.copy(
+        deep=True
+    )
 
     before_metrics = _calculate_metrics(
         before_df
     )
 
-    after_df = project_df.copy(deep=True)
+    after_df = project_df.copy(
+        deep=True
+    )
 
     modified_tasks = _apply_strategy(
         after_df,
@@ -586,9 +638,7 @@ def simulate_strategy_core(
     )
 
     affected_tasks = modified_tasks
-
     status = "feasible"
-
     warnings = []
 
     if not affected_tasks:
@@ -629,74 +679,45 @@ def simulate_strategy_core(
         ),
 
         "assumptions": [
-            "The simulation modifies a copy of the current project only.",
-
-            "The original project data is not modified.",
-
-            "Only changes explicitly represented by the "
-            "strategy are applied.",
-
-            "Metrics are recalculated using ProjectAnalyzer.",
-
+            (
+                "The simulation modifies a copy "
+                "of the current project only."
+            ),
+            (
+                "The original project data "
+                "is not modified."
+            ),
+            (
+                "Only changes explicitly represented "
+                "by the strategy are applied."
+            ),
+            (
+                "Metrics are recalculated "
+                "using ProjectAnalyzer."
+            ),
             "No productivity model is assumed.",
-
             "No resource-capacity model is assumed.",
-
             "No hiring or onboarding model is assumed.",
-
             "No schedule-duration prediction is assumed.",
-
             "No completion-date prediction is assumed.",
         ],
 
         "warnings": warnings,
     }
+
+
 # =========================================================
 # Deterministic Risk / Impact
 # =========================================================
 
-# def _estimate_resource_impact(
-#     strategy: dict,
-# ) -> str:
-
-#     strategy_type = strategy.get(
-#         "type"
-#     )
-
-#     if strategy_type == "resource_reassignment":
-#         return "medium"
-
-#     if strategy_type == "dependency_resolution":
-#         return "medium"
-
-#     if strategy_type == "reprioritization":
-#         return "low"
-
-#     return "high"
-def _estimate_resource_impact(strategy: dict) -> str:
+def _estimate_resource_impact(
+    strategy: dict,
+) -> str:
     return "unknown"
+
+
 def _estimate_risk(
     strategy: dict,
     comparison: dict,
 ) -> str:
     return "unknown"
-
-# def _estimate_risk(
-#     strategy: dict,
-#     comparison: dict,
-# ) -> str:
-
-#     strategy_type = strategy.get(
-#         "type"
-#     )
-
-#     if strategy_type == "reprioritization":
-#         return "low"
-
-#     if strategy_type == "dependency_resolution":
-#         return "medium"
-
-#     if strategy_type == "resource_reassignment":
-#         return "medium"
-
-#     return "high"
