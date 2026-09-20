@@ -805,7 +805,12 @@ def clear_uploaded_file():
 
 
 def clear_analysis_result():
-    for key in ("analysis_output", "project_dataframe", "analyzed_filename"):
+    for key in (
+        "analysis_output",
+        "simulation_output",
+        "project_dataframe",
+        "analyzed_filename",
+    ):
         st.session_state.pop(key, None)
     for key in ("dashboard_project", "dashboard_status", "dashboard_priority"):
         st.session_state.pop(key, None)
@@ -844,19 +849,95 @@ def read_uploaded_csv(uploaded_file):
 # PAGE CONFIGURATION
 # =========================================================
 
+def render_workflow_navigation():
+    stages = ("upload", "analysis", "simulation")
+    selected = st.query_params.get("view", "upload")
+    if selected == "dashboard":
+        selected = "analysis"
+    available = (True, bool(st.session_state.get("analysis_output")) and st.session_state.get("project_dataframe") is not None,
+                 bool(st.session_state.get("simulation_output")) and st.session_state.get("project_dataframe") is not None)
+    if selected not in stages or not available[stages.index(selected)]:
+        selected = "upload"
+    st.query_params["view"] = selected
+    current = stages.index(selected)
+
+    def navigate(destination):
+        st.query_params["view"] = destination
+
+    st.markdown("""<style>
+    .workflow-brand {text-align:center;color:#345EE9;font-size:clamp(22px,3vw,26px);font-weight:750;line-height:1.3;letter-spacing:.08em;margin:4px 0 24px;}
+    .st-key-workflow_navigation {max-width:740px;margin:0 auto 22px;padding:0;
+        border:none!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;}
+    .st-key-workflow_navigation [data-testid="stHorizontalBlock"] {align-items:flex-start;gap:8px;
+        flex-wrap:nowrap;background:none;}
+    .st-key-workflow_navigation [data-testid="stColumn"] {position:relative;}
+    .st-key-workflow_navigation [data-testid="stColumn"]:nth-child(2)::after,
+    .st-key-workflow_navigation [data-testid="stColumn"]:nth-child(3)::after {content:"";position:absolute;top:17px;left:50%;width:calc(100% + 8px);height:1px;background:#DEE6F3;pointer-events:none;}
+    .st-key-workflow_navigation [data-testid="stElementContainer"]:has(button) {width:100%!important;}
+    .st-key-workflow_navigation [data-testid="stButton"] {width:100%;position:relative;z-index:1;}
+    .st-key-workflow_navigation [data-testid="stButton"] button {
+        width:100%!important;min-height:66px!important;margin:0!important;padding:0!important;
+        display:flex!important;flex-direction:column;gap:8px!important;justify-content:flex-start!important;
+        border:0!important;border-radius:0!important;background:transparent!important;
+        box-shadow:none!important;color:#718099!important;opacity:1!important;}
+    .st-key-workflow_navigation [data-testid="stButton"] button::before {
+        content:"";display:block;flex-shrink:0;width:12px;height:12px;margin-top:11px;
+        border-radius:50%;background:#CDD8EA;border:2px solid #F7F9FE;box-shadow:none;}
+    .st-key-workflow_navigation [data-testid="stButton"] button[kind="primary"]::before {
+        background:#5879E2;border-color:#EDF2FF;box-shadow:0 0 0 3px #5879E210;}
+    .st-key-workflow_navigation [data-testid="stButton"] button[kind="primary"] {color:#4F6ED0!important;}
+    .st-key-workflow_navigation [data-testid="stButton"] button p {font-size:13px!important;font-weight:500!important;}
+    .st-key-workflow_navigation [data-testid="stButton"] button:disabled {color:#8795AB!important;}
+    .st-key-workflow_navigation [data-testid="stButton"] button:disabled::before {background:#E0E6F1;box-shadow:0 0 0 1px #D5DEEE;}
+    .st-key-workflow_navigation [data-testid="stButton"] button:focus-visible {outline:2px solid #345EE9!important;outline-offset:4px;}
+    .st-key-workflow_navigation .st-key-workflow_previous button,
+    .st-key-workflow_navigation .st-key-workflow_next button {
+        width:36px!important;height:36px!important;min-height:36px!important;margin:0 auto!important;
+        border:0!important;border-radius:0!important;justify-content:center!important;
+        color:#4F6ED0!important;background:transparent!important;}
+    .st-key-workflow_navigation .st-key-workflow_previous button::before,
+    .st-key-workflow_navigation .st-key-workflow_next button::before {display:none!important;}
+    .st-key-workflow_navigation .st-key-workflow_previous button p,
+    .st-key-workflow_navigation .st-key-workflow_next button p {font-size:22px!important;font-weight:400!important;line-height:1!important;}
+    .st-key-workflow_navigation .st-key-workflow_previous button:disabled,
+    .st-key-workflow_navigation .st-key-workflow_next button:disabled {color:#8395B5!important;border-color:#CDD8EA!important;}
+    @media(max-width:600px) {
+        .st-key-workflow_navigation [data-testid="stHorizontalBlock"] {gap:2px;}
+        .st-key-workflow_navigation [data-testid="stButton"] button p {font-size:12px!important;}
+        .st-key-workflow_navigation .st-key-workflow_previous button,
+        .st-key-workflow_navigation .st-key-workflow_next button {width:34px!important;height:36px!important;min-height:36px!important;}}
+    </style><div class="workflow-brand">UNDER CONTROL</div>""", unsafe_allow_html=True)
+    with st.container(key="workflow_navigation"):
+        columns = st.columns([.4, 1, 1, 1, .4])
+        with columns[0]:
+            st.button("←", key="workflow_previous", help="Previous stage", disabled=current == 0,
+                      on_click=navigate, args=(stages[max(0, current - 1)],))
+        for i, (name, label) in enumerate(zip(stages, ("Upload", "Analysis", "Simulation"))):
+            with columns[i + 1]:
+                st.button(label, key=f"workflow_{name}", disabled=not available[i],
+                          type="primary" if current == i else "secondary", on_click=navigate, args=(name,))
+        with columns[4]:
+            next_index = min(2, current + 1)
+            st.button("→", key="workflow_next", help="Next stage", disabled=current == 2 or not available[next_index],
+                      on_click=navigate, args=(stages[next_index],))
+    return selected
+
+
 st.set_page_config(
     page_title="Under Control",
-    page_icon="🎯",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-if st.query_params.get("view") == "dashboard":
+active_stage = render_workflow_navigation()
+if active_stage in ("analysis", "simulation"):
     importlib.reload(dashboard_white_ui)
     dashboard_white_ui.render_dashboard_ui(
         analysis_output=st.session_state.get("analysis_output"),
+        simulation_output=st.session_state.get("simulation_output"),
         project_df=st.session_state.get("project_dataframe"),
         source_name=st.session_state.get("analyzed_filename"),
+        active_stage=active_stage,
     )
     st.stop()
 
@@ -1481,6 +1562,16 @@ st.markdown(
         div[data-testid="stFileUploader"]::after { right: 18px; }
     }
 
+    /* Hide Streamlit's native add-more-files (+) control from the first render. */
+    div[data-testid="stFileUploader"] button[aria-label="Add file"],
+    div[data-testid="stFileUploader"] button[aria-label="Add files"],
+    div[data-testid="stFileUploader"] button[title="Add file"],
+    div[data-testid="stFileUploader"] button[title="Add files"],
+    div[data-testid="stFileUploader"] .stFileUploaderFile + button,
+    div[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] + button {
+        display: none !important;
+    }
+
     /* The whole card is the upload trigger; no separate button or repeated limit copy. */
     div[data-testid="stFileUploader"] section > span {
         position: absolute !important;
@@ -1531,10 +1622,6 @@ st.markdown(
 # HEADER
 # =========================================================
 
-st.markdown(
-    '<div class="brand">UNDER CONTROL</div>',
-    unsafe_allow_html=True
-)
 
 st.markdown(
     '<div class="main-title">Turn your project data into clarity</div>',
@@ -1555,6 +1642,9 @@ st.markdown('<div class="intake-kicker">Your project story starts here</div>', u
 # FILE UPLOADER
 # =========================================================
 
+if st.session_state.get("analysis_output"):
+    st.info(f"Current project: {st.session_state.get('analyzed_filename', 'Uploaded file')}. Use the steps above to revisit results, or choose a new CSV below.")
+
 uploader_key = f"project_csv_{st.session_state.get('uploader_version', 0)}"
 uploaded_file = st.file_uploader(
     "Drop your CSV file here",
@@ -1568,6 +1658,7 @@ if uploaded_file is not None:
     if st.session_state.get("uploaded_fingerprint") != fingerprint:
         clear_analysis_result()
         st.session_state["uploaded_fingerprint"] = fingerprint
+        st.rerun()
     file_size = uploaded_file.size / (1024 * 1024)
 
     if uploaded_file.size > MAX_UPLOAD_BYTES:
@@ -1614,34 +1705,56 @@ if uploaded_file is not None:
                         with st.spinner("Preparing analysis tools...", show_time=True):
                             from pipeline.pipeline import run_analysis
                         tools_ready = perf_counter()
-                        with st.spinner("Analyzing the project and gathering evidence. Please keep this page open...", show_time=True):
-                            analysis_result = run_analysis(user_df)
+                        with st.spinner(
+                            "Analyzing the project and simulating recovery strategies. Please keep this page open...",
+                            show_time=True,
+                        ):
+                            pipeline_result = run_analysis(user_df)
                         analysis_finished = perf_counter()
                         timing_logger = logging.getLogger("undercontrol.ui.timing")
                         timing_logger.setLevel(logging.INFO)
-                        timing_logger.info("Analysis tools loaded in %.1fs; backend analysis completed in %.1fs",
-                                           tools_ready - started, analysis_finished - tools_ready)
-                        analysis_status.update(label="Analysis completed. Preparing your dashboard...", state="complete", expanded=False)
+                        timing_logger.info(
+                            "Analysis tools loaded in %.1fs; backend pipeline completed in %.1fs",
+                            tools_ready - started,
+                            analysis_finished - tools_ready,
+                        )
+                        analysis_status.update(
+                            label="Analysis and simulation completed. Preparing your dashboard...",
+                            state="complete",
+                            expanded=False,
+                        )
+
+                    if not isinstance(pipeline_result, dict):
+                        raise RuntimeError("No structured pipeline result was returned.")
+
+                    analysis_result = pipeline_result.get("analysis")
+                    simulation_result = pipeline_result.get("simulation")
+
                     if hasattr(analysis_result, "model_dump"):
                         analysis_result = analysis_result.model_dump()
+
+                    if hasattr(simulation_result, "model_dump"):
+                        simulation_result = simulation_result.model_dump()
+
                     if not isinstance(analysis_result, dict) or not analysis_result:
                         raise RuntimeError("No structured analysis was returned.")
-                    st.session_state["project_dataframe"] = dashboard_white_ui.prepare_dashboard_data(user_df)
+
+                    if not isinstance(simulation_result, dict) or not simulation_result:
+                        raise RuntimeError("No structured simulation was returned.")
+
+                    st.session_state["project_dataframe"] = (
+                        dashboard_white_ui.prepare_dashboard_data(user_df)
+                    )
                     st.session_state["analysis_output"] = analysis_result
+                    st.session_state["simulation_output"] = simulation_result
                     st.session_state["analyzed_filename"] = uploaded_file.name
+                    st.query_params["view"] = "analysis"
+                    st.rerun()
                 except Exception:
                     clear_analysis_result()
                     logging.getLogger(__name__).exception("Project analysis failed")
                     st.error("We couldn't complete the analysis because of a technical problem. Please try again. If the problem continues, contact your project administrator.")
 
-        if "analysis_output" in st.session_state:
-            # Existing sessions created before dashboard data was stored can
-            # use the same upload without repeating a paid analysis request.
-            if "project_dataframe" not in st.session_state:
-                st.session_state["project_dataframe"] = dashboard_white_ui.prepare_dashboard_data(read_uploaded_csv(uploaded_file))
-                st.session_state["analyzed_filename"] = uploaded_file.name
-            st.query_params["view"] = "dashboard"
-            st.rerun()
 
 
 # =========================================================
@@ -1653,19 +1766,4 @@ st.markdown(
     'CSV file only &nbsp; • &nbsp; Up to 10 MB'
     '</div>',
     unsafe_allow_html=True
-)
-
-
-st.markdown(
-    '<div class="workflow">'
-    '<div class="workflow-step"><div class="workflow-icon">↑</div>'
-    '<div class="workflow-title">Upload</div><div class="workflow-caption">Your CSV file</div></div>'
-    '<div class="workflow-line"></div>'
-    '<div class="workflow-step"><div class="workflow-icon">✓</div>'
-    '<div class="workflow-title">Validate</div><div class="workflow-caption">Check the file</div></div>'
-    '<div class="workflow-line"></div>'
-    '<div class="workflow-step"><div class="workflow-icon">✦</div>'
-    '<div class="workflow-title">Discover</div><div class="workflow-caption">Find insights</div></div>'
-    '</div>',
-    unsafe_allow_html=True,
 )
