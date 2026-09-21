@@ -33,7 +33,8 @@ Flow:
     Final Result:
         {
             "analysis": AnalysisOutput,
-            "simulation": SimulationOutput
+            "simulation": SimulationOutput,
+            "project_dataframe": DataFrame
         }
 """
 
@@ -71,6 +72,7 @@ def run_analysis(user_df):
         dict containing:
             - analysis
             - simulation
+            - project_dataframe
     """
 
     # =====================================================
@@ -196,4 +198,5 @@ def run_analysis(user_df):
     return {
         "analysis": analysis_result,
         "simulation": simulation_result,
+        "project_dataframe": project_df,
     }
