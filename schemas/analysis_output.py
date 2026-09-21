@@ -79,6 +79,10 @@ class AnalysisOutput(BaseModel):
         default_factory=list
     )
 
+    notes: List[str] = Field(
+        default_factory=list
+    )
+
     evidence: List[str] = Field(
         default_factory=list
     )

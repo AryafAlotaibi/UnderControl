@@ -390,6 +390,7 @@ Determine:
 - schedule signals
 - workload signals
 - supporting evidence
+- notes for relevant minor observations or emerging risks
 - confidence
 - data warnings
 
@@ -433,6 +434,13 @@ EVIDENCE POLICY
 - Distinguish root causes from symptoms.
 - If evidence is incomplete or inconsistent, record the limitation in
   data_warnings and lower confidence when appropriate.
+- data_warnings are only for limitations, missing information, inconsistencies,
+  or reliability problems in the input data. Do not place project observations
+  or operational concerns in data_warnings.
+- Use notes for supported project observations that are worth highlighting but
+  are not strong enough on their own to classify the project as delayed.
+  Examples include workload concentration, a small number of unusually long-running
+  tasks, an emerging dependency risk, or a minor bottleneck.
 - estimated_delay_days must be null unless timing or schedule evidence
   supports a reliable numeric estimate.
 - For root_cause and bottlenecks, affected_tasks may contain only task IDs
@@ -540,10 +548,49 @@ FINAL JSON STRUCTURE
     }}
   ],
 
+  "notes": [],
   "evidence": [],
   "confidence": "high | medium | low",
   "data_warnings": []
 }}
+
+
+PROJECT STATE INTERPRETATION
+
+After completing the full project analysis, assign one overall project_state
+based on the combined evidence. project_state is a final summary of the
+analysis, not the main goal of the analysis.
+
+- "healthy":
+  The project is generally progressing normally and there is no strong evidence
+  of a meaningful current disruption. Minor issues, observations, or emerging
+  risks may still exist and must be reported in notes when supported by evidence.
+  For example, if one assignee has a noticeably concentrated workload but the
+  project is otherwise progressing normally, keep project_state as "healthy"
+  and report the workload observation in notes.
+
+- "delayed":
+  The combined evidence shows meaningful execution problems, bottlenecks,
+  blocking conditions, dependency issues, abnormal task progress, workload
+  problems, or other factors that are materially disrupting project progress.
+  An explicit due-date violation is not required when other current-project
+  evidence clearly supports meaningful disruption.
+
+- "uncertain":
+  Use ONLY when the available evidence is genuinely too incomplete,
+  contradictory, or ambiguous to reasonably determine whether the project is
+  healthy or delayed. Reserve this state for truly unclear cases.
+
+Important:
+- Do not use "uncertain" simply because one or more fields are missing.
+- Do not require due dates to determine project_state.
+- Use all available current-project evidence together before deciding.
+- If the evidence reasonably supports either "healthy" or "delayed", choose
+  that state instead of "uncertain".
+- A healthy or uncertain project may still contain supported observations;
+  place those observations in notes.
+- Do not place data-quality problems in notes. Missing, incomplete,
+  inconsistent, or unreliable data belongs in data_warnings.
 
 
 FINAL OUTPUT RULES
