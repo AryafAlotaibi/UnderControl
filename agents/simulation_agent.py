@@ -40,10 +40,26 @@ def build_simulate_strategy_tool(project_df):
                 "strategy must be a JSON object."
             )
 
-        result = simulate_strategy_core(
-            project_df=project_df,
-            strategy=payload,
-        )
+        try:
+            result = simulate_strategy_core(
+                project_df=project_df,
+                strategy=payload,
+            )
+
+        except Exception as exc:
+            # A candidate selected by the LLM may be invalid for the
+            # current project. Return the simulator rejection to the
+            # agent so it can revise or discard the candidate instead
+            # of crashing the whole Simulation Agent run.
+            return json.dumps(
+                {
+                    "simulation_error": str(exc),
+                    "strategy": payload,
+                },
+                indent=2,
+                ensure_ascii=False,
+                default=str,
+            )
 
         return json.dumps(
             result,
@@ -83,23 +99,14 @@ def build_simulation_tools(
 
 class SimulationAgent:
     """
-    Generate, simulate, compare, and select recovery actions.
+    Review the Analysis Agent diagnosis, choose evidence-supported
+    recovery strategies when appropriate, simulate them, compare the
+    real results, and produce final project guidance.
 
-    The Analysis Agent provides the diagnosis. A small deterministic
-    fallback candidate rule guarantees that an obvious evidence-based
-    management action is actually tested instead of being rejected
-    before simulation.
+    Strategy selection belongs to the LLM reasoning layer.
+    Strategy execution and metric recalculation remain deterministic
+    inside the simulator.
     """
-
-    PRIORITY_RANK = {
-        "lowest": 0,
-        "low": 1,
-        "medium": 2,
-        "normal": 2,
-        "high": 3,
-        "highest": 4,
-        "critical": 5,
-    }
 
     def __init__(
         self,
@@ -111,7 +118,6 @@ class SimulationAgent:
     ):
         self.llm = llm
         self.prompt = prompt
-        self.tools = tools
 
         if isinstance(analysis_output, AnalysisOutput):
             self.analysis_output = analysis_output
@@ -124,6 +130,19 @@ class SimulationAgent:
                 "analysis_output must be an AnalysisOutput "
                 "object or dictionary."
             )
+
+        # Healthy and uncertain projects still use the Simulation Agent
+        # to produce a conclusion and recommended direction, but they are
+        # not allowed to execute recovery what-if strategies.
+        self.tools = list(tools)
+
+        if self.analysis_output.project_state != "delayed":
+            self.tools = [
+                current_tool
+                for current_tool in self.tools
+                if getattr(current_tool, "name", None)
+                != "simulate_strategy"
+            ]
 
         agent = create_react_agent(
             llm=self.llm,
@@ -176,6 +195,9 @@ class SimulationAgent:
             if item.get("task_id"):
                 task_ids.append(item["task_id"])
 
+        for item in analysis.get("workload_signals") or []:
+            task_ids.extend(item.get("related_tasks") or [])
+
         cleaned = []
         seen = set()
 
@@ -224,7 +246,10 @@ class SimulationAgent:
                     or root_cause.explanation
                 )
             else:
-                query = "current project bottlenecks and blocked tasks"
+                query = (
+                    "current project status, progress, workload, "
+                    "dependencies, and notable task patterns"
+                )
 
             request = json.dumps(
                 {
@@ -245,156 +270,11 @@ class SimulationAgent:
             )
 
     # =====================================================
-    # Deterministic Candidate Generation
-    # =====================================================
-
-    def _build_required_candidates(self):
-        """
-        Build conservative fallback candidates for every blocked
-        bottleneck that is below the highest observed project priority.
-
-        These candidates are only testable management actions.
-        They are not automatic recommendations.
-        """
-
-        if self.analysis_output.project_state != "delayed":
-            return []
-
-        bottlenecks = self.analysis_output.model_dump().get(
-            "bottlenecks",
-            [],
-        )
-
-        observed_priorities = []
-
-        for item in bottlenecks:
-            priority = item.get("priority")
-
-            if not priority:
-                continue
-
-            normalized = str(priority).strip().lower()
-
-            if normalized in self.PRIORITY_RANK:
-                observed_priorities.append(
-                    str(priority).strip()
-                )
-
-        if not observed_priorities:
-            return []
-
-        highest_priority = max(
-            observed_priorities,
-            key=lambda value: self.PRIORITY_RANK[
-                value.lower()
-            ],
-        )
-
-        highest_rank = self.PRIORITY_RANK[
-            highest_priority.lower()
-        ]
-
-        candidates = []
-
-        for item in bottlenecks:
-            task_id = item.get("task_id")
-            status = item.get("status")
-            priority = item.get("priority")
-
-            if not task_id or not priority:
-                continue
-
-            current_rank = self.PRIORITY_RANK.get(
-                str(priority).strip().lower()
-            )
-
-            if current_rank is None:
-                continue
-
-            is_blocked = (
-                str(status).strip().lower()
-                == "blocked"
-            )
-
-            if (
-                is_blocked
-                and current_rank < highest_rank
-            ):
-                candidate = {
-                    "type": "reprioritization",
-                    "description": (
-                        f"Raise blocked bottleneck {task_id} "
-                        f"from {priority} to {highest_priority} "
-                        "and test whether supported project "
-                        "signals improve."
-                    ),
-                    "target_tasks": [
-                        str(task_id).strip()
-                    ],
-                    "changes": {
-                        "priority": {
-                            "to": highest_priority
-                        }
-                    },
-                }
-
-                candidates.append(candidate)
-
-        return candidates
-
-    def _simulate_required_candidates(
-        self,
-        candidates,
-    ):
-        """
-        Run deterministic fallback candidates before the LLM evaluates
-        them. This guarantees that a valid fallback candidate is truly
-        simulated rather than rejected before testing.
-        """
-
-        if not candidates:
-            return []
-
-        simulation_tool = self._get_tool(
-            "simulate_strategy"
-        )
-
-        if simulation_tool is None:
-            raise RuntimeError(
-                "simulate_strategy tool is not available."
-            )
-
-        results = []
-
-        for candidate in candidates:
-            strategy_json = json.dumps(
-                candidate,
-                ensure_ascii=False,
-            )
-
-            raw_result = simulation_tool.invoke(
-                {"strategy": strategy_json}
-            )
-
-            if isinstance(raw_result, str):
-                parsed_result = json.loads(raw_result)
-            elif isinstance(raw_result, dict):
-                parsed_result = raw_result
-            else:
-                raise TypeError(
-                    "simulate_strategy returned an unsupported result."
-                )
-
-            results.append(parsed_result)
-
-        return results
-
-    # =====================================================
     # Main Agent Run
     # =====================================================
 
     def simulate(self) -> dict:
-        """Generate and evaluate recovery strategies."""
+        """Evaluate the project and produce final simulation guidance."""
 
         analysis_json = self.analysis_output.model_dump_json(
             indent=2
@@ -402,28 +282,23 @@ class SimulationAgent:
 
         live_context = self._get_live_project_context()
 
-        required_candidates = (
-            self._build_required_candidates()
-        )
-
-        required_results = (
-            self._simulate_required_candidates(
-                required_candidates
+        if self.analysis_output.project_state == "delayed":
+            state_instruction = (
+                "The project is classified as delayed. Decide which of "
+                "the supported recovery strategies are actually relevant "
+                "to the diagnosed problem. Do not test a strategy merely "
+                "because it exists. You may test more than one strategy "
+                "when the evidence supports multiple reasonable alternatives. "
+                "Every candidate must be simulated before it is evaluated "
+                "or selected."
             )
-        )
-
-        required_candidates_json = json.dumps(
-            required_candidates,
-            indent=2,
-            ensure_ascii=False,
-        )
-
-        required_results_json = json.dumps(
-            required_results,
-            indent=2,
-            ensure_ascii=False,
-            default=str,
-        )
+        else:
+            state_instruction = (
+                "The project is not classified as delayed. Do not generate "
+                "or simulate recovery strategies. Review the AnalysisOutput "
+                "and current-project context, then produce the conclusion "
+                "and recommended direction without recovery what-if testing."
+            )
 
         result = self.executor.invoke(
             {
@@ -433,46 +308,21 @@ class SimulationAgent:
                     f"{analysis_json}\n\n"
                     "Live Project Context:\n"
                     f"{live_context}\n\n"
-                    "Required Candidate Strategies:\n"
-                    f"{required_candidates_json}\n\n"
-                    "Required Simulation Results:\n"
-                    f"{required_results_json}\n\n"
-                    "Required Candidate Strategies were generated by "
-                    "a deterministic candidate rule. They are not "
-                    "recommendations. They only represent management "
-                    "actions that are reasonable enough to test.\n\n"
-                    "Required Simulation Results were already produced "
-                    "by simulate_strategy before this LLM evaluation. "
-                    "Preserve these results exactly.\n\n"
-                    "If Required Candidate Strategies is not empty, "
-                    "include every required candidate in "
-                    "candidate_strategies and every required result in "
-                    "simulated_strategies. Do not reject a required "
-                    "candidate before evaluation.\n\n"
-                    "If Required Simulation Results is not empty, do not "
-                    "generate additional simulation candidates and do not "
-                    "call tools again. Evaluate the supplied results and "
-                    "produce the final recovery guidance. If Required "
-                    "Simulation Results is empty, an additional evidence-"
-                    "supported candidate may be created, but it must be "
-                    "simulated before appearing in the final answer.\n\n"
-                    "Judge effectiveness only from actual simulator "
-                    "before/after/comparison values. A feasible strategy "
-                    "does not have to be selected.\n\n"
+                    "Project-State Instruction:\n"
+                    f"{state_instruction}\n\n"
+                    "For delayed projects, strategy selection is your "
+                    "reasoning responsibility. Use current-project evidence "
+                    "to decide which supported strategy or strategies are "
+                    "worth testing, then rely only on real simulator results "
+                    "to judge feasibility and effectiveness.\n\n"
                     "Never invent delay reduction, productivity, resource "
                     "capacity, cost, completion dates, or days saved."
                 )
             }
         )
 
-        output = self._validate_output(
+        return self._validate_output(
             result.get("output")
-        )
-
-        return self._enforce_required_results(
-            output=output,
-            required_candidates=required_candidates,
-            required_results=required_results,
         )
 
     # =====================================================
@@ -512,206 +362,3 @@ class SimulationAgent:
         )
 
         return simulation.model_dump()
-
-    # =====================================================
-    # Required Result Safety Net
-    # =====================================================
-
-    @staticmethod
-    def _strategy_key(strategy):
-        return json.dumps(
-            {
-                "type": strategy.get("type"),
-                "target_tasks": strategy.get(
-                    "target_tasks",
-                    [],
-                ),
-                "changes": strategy.get(
-                    "changes",
-                    {},
-                ),
-            },
-            sort_keys=True,
-            ensure_ascii=False,
-        )
-
-    def _build_comparison_from_result(self, result):
-        """Create a conservative text comparison from simulator facts."""
-
-        strategy = result.get("strategy") or {}
-        comparison = result.get("comparison") or {}
-        schedule = comparison.get("schedule_signals") or {}
-
-        improvements = []
-        unchanged = []
-
-        for metric_name, values in schedule.items():
-            delta = values.get("delta")
-
-            if delta is None:
-                continue
-
-            if delta < 0:
-                improvements.append(
-                    f"{metric_name} decreased by {abs(delta)}"
-                )
-            elif delta == 0:
-                unchanged.append(metric_name)
-
-        if improvements:
-            effectiveness = (
-                "Supported improvement: "
-                + "; ".join(improvements)
-                + "."
-            )
-        elif unchanged:
-            effectiveness = (
-                "No improvement was demonstrated in the supported "
-                "schedule signals."
-            )
-        else:
-            effectiveness = (
-                "The simulator applied the change, but the available "
-                "comparison does not establish a schedule improvement."
-            )
-
-        return {
-            "strategy_type": strategy.get(
-                "type",
-                "unknown",
-            ),
-            "effectiveness": effectiveness,
-            "feasibility": result.get(
-                "status",
-                "unknown",
-            ),
-            "risk": result.get(
-                "risk",
-                "unknown",
-            ),
-            "resource_impact": result.get(
-                "resource_impact",
-                "unknown",
-            ),
-            "summary": (
-                "This candidate was simulated using the deterministic "
-                "project simulator and evaluated from its actual "
-                "before/after metrics."
-            ),
-        }
-
-    def _enforce_required_results(
-        self,
-        output,
-        required_candidates,
-        required_results,
-    ):
-        """
-        Safety net: if the LLM omits a deterministic required candidate
-        or its real simulator result, restore those factual values.
-        """
-
-        if not required_candidates:
-            return output
-
-        candidate_keys = {
-            self._strategy_key(item)
-            for item in output.get(
-                "candidate_strategies",
-                [],
-            )
-        }
-
-        for candidate in required_candidates:
-            key = self._strategy_key(candidate)
-
-            if key not in candidate_keys:
-                output.setdefault(
-                    "candidate_strategies",
-                    [],
-                ).append(candidate)
-                candidate_keys.add(key)
-
-        simulated_keys = {
-            self._strategy_key(
-                item.get("strategy") or {}
-            )
-            for item in output.get(
-                "simulated_strategies",
-                [],
-            )
-        }
-
-        added_result = False
-
-        for simulation_result in required_results:
-            strategy = simulation_result.get(
-                "strategy"
-            ) or {}
-            key = self._strategy_key(strategy)
-
-            if key not in simulated_keys:
-                output.setdefault(
-                    "simulated_strategies",
-                    [],
-                ).append(simulation_result)
-                simulated_keys.add(key)
-                added_result = True
-
-        if added_result and not output.get("comparison"):
-            output["comparison"] = [
-                self._build_comparison_from_result(
-                    simulation_result
-                )
-                for simulation_result in required_results
-            ]
-
-        if added_result:
-            output["explanation"] = (
-                "At least one evidence-based management candidate was "
-                "tested with the deterministic simulator. The strategy "
-                "is selected only if the actual before/after metrics "
-                "show a meaningful supported improvement."
-            )
-
-            contradictory_phrases = (
-                "no simulator call",
-                "no simulator calls",
-                "no supported recovery strategy was simulated",
-                "no candidate strategy was created",
-                "no candidates were advanced",
-            )
-
-            cleaned_warnings = []
-
-            for warning in output.get("warnings") or []:
-                normalized = str(warning).lower()
-
-                if any(
-                    phrase in normalized
-                    for phrase in contradictory_phrases
-                ):
-                    continue
-
-                cleaned_warnings.append(warning)
-
-            output["warnings"] = cleaned_warnings
-
-        assumption = (
-            "Deterministic fallback candidates are testable management "
-            "actions, not automatic recommendations."
-        )
-
-        assumptions = output.setdefault(
-            "assumptions",
-            [],
-        )
-
-        if assumption not in assumptions:
-            assumptions.append(assumption)
-
-        validated = SimulationOutput.model_validate(
-            output
-        )
-
-        return validated.model_dump()
