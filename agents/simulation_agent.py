@@ -137,7 +137,7 @@ class SimulationAgent:
             tools=self.tools,
             verbose=verbose,
             handle_parsing_errors=True,
-            max_iterations=4,
+            max_iterations=8,
             early_stopping_method="force",
         )
 

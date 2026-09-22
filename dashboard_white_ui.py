@@ -558,9 +558,58 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
     .control-label::before { content:""; width:22px; height:1px; background:#A9C4EE; }
     .stat-card { border-top:3px solid transparent; background:linear-gradient(#FFF,#FFF) padding-box,linear-gradient(90deg,#4B88F5,#8B5CF6,#2DD4BF) border-box; }
     .widget:first-child { border-top:3px solid #4E8CF6; }
+    .focus-card { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr); gap:18px; margin:18px 0 8px; padding:22px; overflow:hidden; background:linear-gradient(115deg,#FFFFFF 0%,#F6F9FF 67%,#F3EEFF 100%); border:1px solid #DEE8F7; border-radius:18px; box-shadow:0 14px 30px rgba(27,55,97,.055); }
+    .focus-card::after { content:""; position:absolute; right:-54px; top:-58px; width:170px; height:170px; border:1px solid rgba(102,119,232,.13); border-radius:50%; box-shadow:0 0 0 24px rgba(102,119,232,.035),0 0 0 48px rgba(68,190,191,.025); }
+    .focus-icon { position:relative; z-index:1; display:grid; place-items:center; width:46px; height:46px; border-radius:15px; color:#FFF; background:linear-gradient(145deg,#4B88F5,#7865E7); box-shadow:0 10px 22px rgba(74,103,214,.22); font-size:19px; }
+    .focus-content { position:relative; z-index:1; }
+    .focus-label { color:#6F83A4; font-size:9px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    .focus-title { max-width:850px; margin-top:6px; color:#182641; font-size:18px; line-height:1.35; font-weight:770; letter-spacing:-.025em; }
+    .focus-copy { max-width:900px; margin-top:7px; color:#71829B; font-size:11px; line-height:1.65; }
+    .focus-tasks { display:flex; flex-wrap:wrap; gap:6px; margin-top:13px; }
+    .focus-tasks span { padding:5px 8px; color:#536C9C; background:#EEF4FF; border:1px solid #D9E6FA; border-radius:99px; font-size:9px; font-weight:750; }
+    .attention-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:8px; }
+    .attention-card { position:relative; min-height:150px; padding:17px 18px 16px; overflow:hidden; background:#FFF; border:1px solid #E5ECF7; border-radius:16px; box-shadow:0 10px 24px rgba(27,55,97,.04); transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
+    .attention-card:hover { transform:translateY(-2px); border-color:#C9D9F3; box-shadow:0 14px 30px rgba(27,55,97,.075); }
+    .attention-card::before { content:""; position:absolute; left:0; top:18px; bottom:18px; width:3px; border-radius:0 4px 4px 0; background:linear-gradient(#4B88F5,#8B5CF6); }
+    .attention-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .attention-id { color:#325FC1; font-size:12px; font-weight:820; letter-spacing:.02em; }
+    .attention-tags { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:5px; }
+    .attention-tag { padding:4px 7px; color:#6E7F98; background:#F4F7FB; border-radius:99px; font-size:8px; font-weight:760; }
+    .attention-tag.blocked { color:#B45355; background:#FFF0F1; }
+    .attention-tag.priority { color:#7A57B5; background:#F3EEFF; }
+    .attention-summary { margin-top:13px; color:#263650; font-size:12px; line-height:1.45; font-weight:720; }
+    .attention-reason { margin-top:8px; color:#7A899F; font-size:10px; line-height:1.55; }
+    .attention-impact { margin-top:10px; padding-top:9px; border-top:1px solid #EEF2F7; color:#8795AA; font-size:9px; line-height:1.45; }
+    .impact-layout { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); gap:14px; margin:8px 0 22px; }
+    .impact-panel { padding:20px; background:linear-gradient(145deg,#FFF 0%,#F8FAFF 100%); border:1px solid #E3EAF6; border-radius:18px; box-shadow:0 10px 26px rgba(27,55,97,.04); }
+    .impact-panel.accent { background:linear-gradient(145deg,#172746 0%,#29447E 100%); border-color:transparent; }
+    .impact-kicker { margin-bottom:5px; color:#7185A6; font-size:9px; font-weight:820; letter-spacing:.13em; text-transform:uppercase; }
+    .impact-panel.accent .impact-kicker { color:#AFC9F8; }
+    .impact-heading { margin-bottom:14px; color:#1E2D48; font-size:16px; font-weight:780; letter-spacing:-.025em; }
+    .impact-panel.accent .impact-heading { color:#FFF; }
+    .dependency-item { display:grid; grid-template-columns:minmax(72px,.7fr) 24px minmax(72px,.7fr) minmax(120px,1.35fr); align-items:center; gap:8px; padding:11px 0; border-top:1px solid #EDF2F8; }
+    .dependency-item:first-of-type { border-top:0; padding-top:2px; }
+    .dependency-node { padding:7px 8px; border-radius:9px; background:#EDF4FF; color:#315EBA; font-size:9px; font-weight:800; text-align:center; overflow-wrap:anywhere; }
+    .dependency-node.source { background:#F2EDFF; color:#7352B8; }
+    .dependency-arrow { color:#9CAFD0; font-size:15px; text-align:center; }
+    .dependency-copy { color:#75869E; font-size:9px; line-height:1.5; }
+    .workload-item { padding:11px 0; border-top:1px solid rgba(218,229,252,.14); }
+    .workload-item:first-of-type { border-top:0; padding-top:2px; }
+    .workload-person { color:#FFF; font-size:11px; font-weight:760; }
+    .workload-issue { margin-top:4px; color:#C4D5F2; font-size:9px; line-height:1.5; }
+    .workload-tasks { margin-top:5px; color:#8FADD9; font-size:8px; font-weight:700; }
+    .impact-empty { padding:14px; color:#71829B; background:#F3F7FD; border-radius:12px; font-size:10px; line-height:1.5; }
+    .impact-panel.accent .impact-empty { color:#C4D5F2; background:rgba(255,255,255,.07); }
+    .data-note { display:flex; align-items:flex-start; gap:10px; margin:3px 0 18px; padding:11px 13px; color:#816A3E; background:#FFF9E9; border:1px solid #F5E9C6; border-radius:12px; font-size:10px; line-height:1.55; }
+    .data-note strong { color:#6C552C; }
+    .agent-note { display:flex; align-items:flex-start; gap:10px; margin:3px 0 18px; padding:13px 15px; color:#506783; background:linear-gradient(110deg,#F5F8FF,#F8F5FF); border:1px solid #DCE6FA; border-radius:14px; box-shadow:0 8px 20px rgba(41,72,139,.04); font-size:11px; line-height:1.6; }
+    .agent-note > span { color:#5B72E8; font-size:14px; line-height:1.3; }
+    .agent-note strong { color:#304E8B; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .agent-note ul { margin:7px 0 0; padding-left:17px; }
+    .agent-note li + li { margin-top:4px; }
     @media(max-width:760px) { .command-deck { grid-template-columns:minmax(0,1fr) 150px; } .signal-orbit { display:block; transform:scale(.74); transform-origin:right center; } .command-copy { padding:25px; } }
     @media(max-width:580px) { .command-deck { grid-template-columns:1fr; } .signal-orbit { display:none; } }
-    @media(max-width:760px) { .block-container { padding:20px 18px 52px; } .dashboard-title { font-size:26px; } .issue-head,.issue-row { grid-template-columns:1.15fr .9fr .9fr; } .issue-head > :nth-child(n+4),.issue-row > :nth-child(n+4) { display:none; } }
+    @media(max-width:760px) { .block-container { padding:20px 18px 52px; } .dashboard-title { font-size:26px; } .focus-card { grid-template-columns:1fr; } .attention-grid,.impact-layout { grid-template-columns:1fr; } .dependency-item { grid-template-columns:minmax(70px,1fr) 20px minmax(70px,1fr); } .dependency-copy { grid-column:1/-1; } .issue-head,.issue-row { grid-template-columns:1.15fr .9fr .9fr; } .issue-head > :nth-child(n+4),.issue-row > :nth-child(n+4) { display:none; } }
 </style>
 """,
         unsafe_allow_html=True,
@@ -576,130 +625,194 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
         st.caption(f"Source: {source_name or 'Uploaded project'} · {len(project_df):,} tasks analyzed")
 
         state = analysis_output.get("project_state")
-        state_label = {"healthy": "Healthy", "delayed": "Delayed", "uncertain": "Not enough evidence to determine project health"}.get(state, "Project health unavailable")
-        state_detail = {
-            "healthy": "The analysis found evidence supporting a healthy project state.",
-            "delayed": "The analysis found evidence of project delay. Review the supporting findings below.",
-            "uncertain": "You can explore the available task data below. More information is needed to determine overall project health."
-        }.get(state, "Review the available data and analysis limitations below.")
+        state_label = str(state).replace("_", " ").title() if state else ""
+        confidence = analysis_output.get("confidence")
         st.markdown(
             '<div class="command-deck"><div class="command-copy">'
             '<div class="command-eyebrow">PROJECT HEALTH</div>'
             f'<div class="command-title">{html.escape(state_label)}</div>'
-            f'<div class="command-text">{html.escape(state_detail)}</div>'
-            f'<div class="command-tags"><span>Confidence: {html.escape(str(analysis_output.get("confidence", "Unavailable")).title())}</span></div>'
-            '</div><div class="signal-orbit"><span class="orbit-dot one"></span><span class="orbit-dot two"></span><span class="orbit-dot three"></span><div class="orbit-core">⌁</div></div></div>',
+            + (f'<div class="command-tags"><span>Confidence: {html.escape(str(confidence).title())}</span></div>' if confidence else '')
+            + '</div><div class="signal-orbit"><span class="orbit-dot one"></span><span class="orbit-dot two"></span><span class="orbit-dot three"></span><div class="orbit-core">⌁</div></div></div>',
             unsafe_allow_html=True,
         )
         warnings = list(analysis_output.get("data_warnings") or [])
         delay = analysis_output.get("estimated_delay_days")
-        if warnings or delay is None:
-            st.caption("Some information is unavailable. See Analysis details for limitations.")
+        if warnings:
+            warning_html = "<br>".join(html.escape(str(item)) for item in dict.fromkeys(warnings))
+            st.markdown(
+                '<div class="data-note"><span>◇</span><div><strong>Data note</strong><br>'
+                f'{warning_html}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        agent_notes = []
+        for note in analysis_output.get("notes") or []:
+            if note is not None and str(note).strip():
+                agent_notes.append(str(note).strip())
+
+        if agent_notes:
+            notes_html = "".join(
+                f"<li>{html.escape(note)}</li>"
+                for note in dict.fromkeys(agent_notes)
+            )
+            st.markdown(
+                '<div class="agent-note"><span>✦</span><div><strong>Project note</strong>'
+                f'<ul>{notes_html}</ul></div></div>',
+                unsafe_allow_html=True,
+            )
+
         if delay is not None:
             st.caption(f"Estimated project delay: {delay:g} days")
 
         signals = analysis_output.get("schedule_signals") or {}
         overview = [
-            ("Blocked tasks", signals.get("blocked_tasks"), "Tasks unable to move forward"),
-            ("Overdue tasks", signals.get("overdue_tasks"), "Unfinished tasks past their due date"),
-            ("High-priority unfinished", signals.get("unfinished_high_priority_tasks"), "Important work still open"),
+            ("Blocked tasks", signals.get("blocked_tasks"), ""),
+            ("Overdue tasks", signals.get("overdue_tasks"), ""),
+            ("High-priority unfinished", signals.get("unfinished_high_priority_tasks"), ""),
         ]
-        for column, (label, value, note) in zip(st.columns(3), overview):
-            with column:
-                metric_card(label, value, note)
+        available_overview = [item for item in overview if item[1] is not None]
+        if available_overview:
+            for column, (label, value, note) in zip(st.columns(len(available_overview)), available_overview):
+                with column:
+                    metric_card(label, value, note)
 
         root = analysis_output.get("root_cause") or {}
-        with st.container(border=True):
-            st.subheader("What's holding the project back?")
-            st.write(root.get("summary") or "There isn't enough evidence to identify the main cause.")
+        if root:
+            root_summary = root.get("summary")
+            root_explanation = root.get("explanation")
+            affected_tasks = root.get("affected_tasks") or []
+            affected_html = "".join(
+                f"<span>{html.escape(str(task))}</span>"
+                for task in affected_tasks[:8]
+            )
+            st.markdown(
+                '<div class="focus-card">'
+                '<div class="focus-icon">⌁</div>'
+                '<div class="focus-content">'
+                '<div class="focus-label">Primary focus</div>'
+                + (f'<div class="focus-title">{html.escape(str(root_summary))}</div>' if root_summary else '')
+                + (f'<div class="focus-copy">{html.escape(str(root_explanation))}</div>' if root_explanation else '')
+                + (f'<div class="focus-tasks">{affected_html}</div>' if affected_html else '')
+                + '</div></div>',
+                unsafe_allow_html=True,
+            )
 
-        st.subheader("Tasks needing attention")
         # Combine duplicate task references for presentation only; retain agent order.
         attention = {}
         for item in analysis_output.get("bottlenecks") or []:
-            key = item.get("task_id") or f"Unidentified task {len(attention) + 1}"
-            attention[key] = {"Task": key, "Summary": item.get("summary") or "", "Why it matters": item.get("reason") or "Not available", "Impact": item.get("impact") or "Not available"}
+            key = item.get("task_id")
+            if not key:
+                continue
+            attention[key] = {
+                "Task": key,
+                "Summary": item.get("summary"),
+                "Why it matters": item.get("reason"),
+                "Impact": item.get("impact"),
+                "Status": item.get("status"),
+                "Priority": item.get("priority"),
+            }
         for item in analysis_output.get("critical_tasks") or []:
-            key = item.get("task_id") or f"Unidentified task {len(attention) + 1}"
-            if key not in attention:
-                attention[key] = {"Task": key, "Summary": "", "Why it matters": item.get("reason") or "Not available", "Impact": "Not available"}
+            key = item.get("task_id")
+            if key and key not in attention:
+                attention[key] = {
+                    "Task": key,
+                    "Summary": item.get("reason"),
+                    "Why it matters": None,
+                    "Impact": None,
+                    "Status": None,
+                    "Priority": None,
+                }
         if attention:
-            st.dataframe(pd.DataFrame(list(attention.values())[:5]), hide_index=True, width="stretch")
-            if len(attention) > 5:
-                st.caption(f"Showing the first 5 of {len(attention)} flagged tasks. All findings are in Analysis details.")
-        else:
-            st.info("No specific tasks were flagged in the available analysis.")
-
-        with st.expander("Analysis details", expanded=False):
-            if root.get("explanation"):
-                st.write(root["explanation"])
-            if root.get("affected_tasks"):
-                st.write("Affected tasks: " + ", ".join(map(str, root["affected_tasks"])))
-            if delay is None:
-                st.info("An estimated delay in days was not available in this analysis.")
-            for warning in dict.fromkeys(warnings):
-                st.write("• " + str(warning))
-            tabs = st.tabs(["Bottlenecks", "Critical tasks", "Dependencies", "Workload", "Evidence"])
-            with tabs[0]:
-                rows = analysis_output.get("bottlenecks") or []
-                if not rows:
-                    st.info("Not provided by the Analysis Agent.")
-                for item in rows:
-                    task_id = item.get("task_id") or "Task"
-                    summary = item.get("summary") or ""
-                    with st.expander(f"{task_id} · {summary}".rstrip(" ·"), expanded=True):
-                        details = []
-                        if item.get("status"):
-                            details.append(f"Status: {item['status']}")
-                        if item.get("priority"):
-                            details.append(f"Priority: {item['priority']}")
-                        if item.get("assignee"):
-                            details.append(f"Assignee: {item['assignee']}")
-                        if details:
-                            st.caption(" · ".join(details))
-                        st.write("Reason: " + (item.get("reason") or "Not provided by the Analysis Agent."))
-                        st.write("Impact: " + (item.get("impact") or "Not provided by the Analysis Agent."))
-                        affected = item.get("affected_tasks") or []
-                        st.write("Affected tasks: " + (", ".join(map(str, affected)) if affected else "Not provided by the Analysis Agent."))
-            with tabs[1]:
-                rows = analysis_output.get("critical_tasks") or []
-                if rows:
-                    st.dataframe(
-                        pd.DataFrame(rows).rename(columns={"task_id": "Task", "reason": "Why it matters"}),
-                        hide_index=True,
-                        use_container_width=True,
+            st.markdown('<div class="section-name">Tasks needing attention</div>', unsafe_allow_html=True)
+            cards = []
+            for item in list(attention.values())[:5]:
+                tags = []
+                if item.get("Status"):
+                    status_class = " blocked" if str(item["Status"]).strip().lower() == "blocked" else ""
+                    tags.append(
+                        f'<span class="attention-tag{status_class}">{html.escape(str(item["Status"]))}</span>'
                     )
-                else:
-                    st.info("Not provided by the Analysis Agent.")
-            with tabs[2]:
-                rows = analysis_output.get("dependencies") or []
-                if rows:
-                    dependency_df = pd.DataFrame(rows).rename(columns={
-                        "blocked_task": "Blocked task",
-                        "depends_on": "Depends on",
-                        "impact": "Impact",
-                        "affected_tasks": "Affected tasks",
-                    })
-                    st.dataframe(dependency_df, hide_index=True, use_container_width=True)
-                else:
-                    st.info("Not provided by the Analysis Agent.")
-            with tabs[3]:
-                rows = analysis_output.get("workload_signals") or []
-                if not rows:
-                    st.info("Not provided by the Analysis Agent.")
-                for item in rows:
-                    with st.container(border=True):
-                        st.write(f"Assignee: {item.get('assignee') or 'Not provided by the Analysis Agent.'}")
-                        st.write("Issue: " + (item.get("issue") or "Not provided by the Analysis Agent."))
-                        related = item.get("related_tasks") or []
-                        st.write("Related tasks: " + (", ".join(map(str, related)) if related else "Not provided by the Analysis Agent."))
-            with tabs[4]:
-                rows = analysis_output.get("evidence") or []
-                if rows:
-                    for item in rows:
-                        st.write(f"• {item}")
-                else:
-                    st.info("Not provided by the Analysis Agent.")
+                if item.get("Priority"):
+                    tags.append(
+                        f'<span class="attention-tag priority">{html.escape(str(item["Priority"]))}</span>'
+                    )
+                summary = item.get("Summary") or item.get("Why it matters")
+                cards.append(
+                    '<article class="attention-card">'
+                    '<div class="attention-head">'
+                    f'<div class="attention-id">{html.escape(str(item["Task"]))}</div>'
+                    f'<div class="attention-tags">{"".join(tags)}</div>'
+                    '</div>'
+                    + (f'<div class="attention-summary">{html.escape(str(summary))}</div>' if summary else '')
+                    + (f'<div class="attention-reason">{html.escape(str(item["Why it matters"]))}</div>' if item.get("Why it matters") and item.get("Why it matters") != summary else '')
+                    + (f'<div class="attention-impact">Impact · {html.escape(str(item["Impact"]))}</div>' if item.get("Impact") else '')
+                    + '</article>'
+                )
+            st.markdown(
+                f'<div class="attention-grid">{"".join(cards)}</div>',
+                unsafe_allow_html=True,
+            )
+            if len(attention) > 5:
+                st.caption(f"Showing 5 of {len(attention)} tasks returned by the Analysis Agent.")
+
+        dependencies = list(analysis_output.get("dependencies") or [])
+        workload = list(analysis_output.get("workload_signals") or [])
+
+        dependency_items = []
+        for item in dependencies[:4]:
+            blocked = item.get("blocked_task")
+            source = item.get("depends_on")
+            impact = item.get("impact")
+            if not blocked or not source:
+                continue
+            dependency_items.append(
+                '<div class="dependency-item">'
+                f'<div class="dependency-node">{html.escape(str(blocked))}</div>'
+                '<div class="dependency-arrow">←</div>'
+                f'<div class="dependency-node source">{html.escape(str(source))}</div>'
+                + (f'<div class="dependency-copy">{html.escape(str(impact))}</div>' if impact else '')
+                + '</div>'
+            )
+
+        workload_items = []
+        for item in workload[:3]:
+            assignee = item.get("assignee")
+            issue = item.get("issue")
+            if not issue:
+                continue
+            related = item.get("related_tasks") or []
+            related_text = ", ".join(map(str, related[:5]))
+            workload_items.append(
+                '<div class="workload-item">'
+                + (f'<div class="workload-person">{html.escape(str(assignee))}</div>' if assignee else '')
+                + f'<div class="workload-issue">{html.escape(str(issue))}</div>'
+                + (f'<div class="workload-tasks">Related · {html.escape(related_text)}</div>' if related_text else '')
+                + '</div>'
+            )
+
+        impact_panels = []
+        if dependency_items:
+            impact_panels.append(
+                '<section class="impact-panel">'
+                '<div class="impact-kicker">FLOW AT RISK</div>'
+                '<div class="impact-heading">Dependencies holding work back</div>'
+                f'{"".join(dependency_items)}'
+                '</section>'
+            )
+        if workload_items:
+            impact_panels.append(
+                '<section class="impact-panel accent">'
+                '<div class="impact-kicker">TEAM SIGNAL</div>'
+                '<div class="impact-heading">Workload to watch</div>'
+                f'{"".join(workload_items)}'
+                '</section>'
+            )
+        if impact_panels:
+            st.markdown(
+                '<div class="section-name">Project impact map</div>'
+                f'<div class="impact-layout">{"".join(impact_panels)}</div>',
+                unsafe_allow_html=True,
+            )
 
 
         with st.expander("Explore project data", expanded=False):
@@ -725,26 +838,19 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
             else:
                 metrics = ProjectAnalyzer().prepare_project(filtered)["metrics"]
                 known_resolution = any(populated(filtered, c).any() for c in ("status", "resolution", "resolution_date"))
-                resolution = metrics.get("average_resolution_time_minutes")
-                points = pd.to_numeric(filtered["story_point"], errors="coerce") if "story_point" in filtered else pd.Series(dtype=float)
-                point_total = points.sum(min_count=1)
                 stats = [
                     ("Total issues", len(filtered), "Tasks matching your filters"),
                     ("Resolved work", metrics.get("resolved_issues") if known_resolution else None, "Known completion signals"),
-                    ("Avg. resolution time", None if resolution is None else f"{resolution:,.0f} min", "Recorded resolution duration"),
-                    ("Story points", None if pd.isna(point_total) else f"{point_total:,.1f}", "Sum of available estimates"),
                 ]
-                for column, (label, value, note) in zip(st.columns(4), stats):
+                for column, (label, value, note) in zip(st.columns(2), stats):
                     with column:
                         metric_card(label, value, note)
                 for container, field, title, color in zip(st.columns(2), ("status", "priority"), ("Issue status", "Priority mix"), ("#4B88F5", "#8B5CF6")):
                     with container:
                         render_distribution(filtered, field, title, color)
-                for container, field, title, color in zip(st.columns(2), ("type", "assignee_id"), ("Issue types", "Tasks per assignee"), ("#20BDAA", "#4B88F5")):
-                    with container:
-                        render_distribution(filtered, field, title, color)
+                render_distribution(filtered, "assignee_id", "Tasks per assignee", "#4B88F5")
                 st.markdown('<div class="section-name">Issue register</div>', unsafe_allow_html=True)
-                labels = {"issue_key": "Issue", "issue_id": "ID", "text": "Task details", "type": "Type", "priority": "Priority", "status": "Status", "assignee_id": "Assignee", "creation_date": "Created", "due_date": "Due", "resolution_date": "Resolved", "story_point": "Story points"}
+                labels = {"issue_key": "Issue", "issue_id": "ID", "text": "Task details", "priority": "Priority", "status": "Status", "assignee_id": "Assignee", "creation_date": "Created", "due_date": "Due", "resolution_date": "Resolved"}
                 columns = [c for c in labels if c in filtered and populated(filtered, c).any()]
                 if columns:
                     date_columns = {
@@ -772,112 +878,193 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
             def _esc(value):
                 return html.escape(str(value)) if value is not None else ""
 
+            def _flatten_output(value, prefix=""):
+                rows = []
+                if isinstance(value, dict):
+                    for key, item in value.items():
+                        label = f"{prefix} · {key}" if prefix else str(key)
+                        if isinstance(item, dict):
+                            rows.extend(_flatten_output(item, label))
+                        else:
+                            rows.append((label, item))
+                return rows
+
+            def _value_text(value):
+                if isinstance(value, list):
+                    return ", ".join(map(str, value))
+                return str(value)
+
+            def _output_rows(value):
+                return "".join(
+                    '<div class="uc-output-row">'
+                    f'<span>{_esc(label).replace("_", " ")}</span>'
+                    f'<strong>{_esc(_value_text(item))}</strong>'
+                    '</div>'
+                    for label, item in _flatten_output(value)
+                )
+
             identified_problem = simulation_output.get("identified_problem") or ""
             candidate_strategies = simulation_output.get("candidate_strategies") or []
             simulated_strategies = simulation_output.get("simulated_strategies") or []
             selected_strategy = simulation_output.get("selected_strategy")
+            selected_simulation = simulation_output.get("selected_simulation")
+            expected_delay_reduction = simulation_output.get("expected_delay_reduction")
             recovery_plan_summary = simulation_output.get("recovery_plan_summary") or ""
             recovery_execution_order = simulation_output.get("recovery_execution_order") or []
             recovery_order_reason = simulation_output.get("recovery_order_reason") or ""
             explanation = simulation_output.get("explanation") or ""
 
-            selected_type = selected_strategy.get("type") if isinstance(selected_strategy, dict) else None
-            selected_description = selected_strategy.get("description") if isinstance(selected_strategy, dict) else ""
-            selected_targets = selected_strategy.get("target_tasks") if isinstance(selected_strategy, dict) else []
-            selected_targets = selected_targets or []
+            selected_strategy_payload = selected_strategy if isinstance(selected_strategy, dict) else {}
+            if not selected_strategy_payload and isinstance(selected_simulation, dict):
+                selected_strategy_payload = selected_simulation.get("strategy") or {}
+            selected_description = selected_strategy_payload.get("description") or ""
+            selected_type = selected_strategy_payload.get("type") or ""
 
-            selected_result = None
-            if selected_type:
-                for result in simulated_strategies:
-                    strategy = result.get("strategy") or {}
-                    if strategy.get("type") == selected_type:
-                        selected_result = result
-                        break
-            if selected_result is None and simulated_strategies:
-                selected_result = simulated_strategies[0]
-
-            discarded_result = None
-            for result in simulated_strategies:
-                strategy = result.get("strategy") or {}
-                if selected_type and strategy.get("type") == selected_type:
-                    continue
-                discarded_result = result
-                break
-
-            # Exact metric slots from the React reference.
-            metric_map = {
-                "overdue_tasks": ("Overdue Tasks", "◷"),
-                "blocked_tasks": ("Blocked Tasks", "⚠"),
-                "unfinished_high_priority_tasks": ("High Priority Unfinished", "◎"),
-            }
-
-            comparison = (selected_result or {}).get("comparison") or {}
-            schedule_comparison = comparison.get("schedule_signals") or {}
-            metric_cards = []
-
-            for key, (label, icon) in metric_map.items():
-                values = schedule_comparison.get(key) or {}
-                metric_cards.append({
-                    "label": label,
-                    "icon": icon,
-                    "before": values.get("before"),
-                    "after": values.get("after"),
-                })
-
-            dependency_values = comparison.get("dependency_count") or {}
-            metric_cards.append({
-                "label": "Dependency Count",
-                "icon": "⑂",
-                "before": dependency_values.get("before"),
-                "after": dependency_values.get("after"),
-            })
-
-            # Target shown in the section title.
-            target_label = None
-            if selected_targets:
-                target_label = str(selected_targets[0])
-            elif selected_result:
-                affected = selected_result.get("affected_tasks") or []
-                if affected:
-                    target_label = str(affected[0])
-
-            if not target_label:
-                target_label = "Recovery Strategy"
-
-            discarded_text = ""
-            if discarded_result:
-                discarded_text = (
-                    discarded_result.get("expected_effect")
-                    or (discarded_result.get("strategy") or {}).get("description")
-                    or "This simulated alternative was not selected as the final recovery direction."
+            candidate_cards_html = ""
+            for index, strategy in enumerate(candidate_strategies, start=1):
+                description = strategy.get("description")
+                strategy_type = strategy.get("type")
+                target_tasks = strategy.get("target_tasks") or []
+                changes = strategy.get("changes") or {}
+                target_html = "".join(f'<span>{_esc(task_id)}</span>' for task_id in target_tasks)
+                candidate_cards_html += (
+                    '<article class="uc-strategy-card candidate">'
+                    f'<div class="uc-strategy-index">0{index}</div>'
+                    + (f'<div class="uc-strategy-type">{_esc(strategy_type)}</div>' if strategy_type else '')
+                    + (f'<div class="uc-strategy-desc">{_esc(description)}</div>' if description else '')
+                    + (f'<div class="uc-strategy-targets"><small>Target tasks</small>{target_html}</div>' if target_html else '')
+                    + (f'<details class="uc-detail"><summary>Proposed changes</summary><div class="uc-output-table">{_output_rows(changes)}</div></details>' if changes else '')
+                    + '</article>'
                 )
-            elif simulated_strategies and not selected_strategy:
-                first_result = simulated_strategies[0]
-                discarded_text = (
-                    first_result.get("expected_effect")
-                    or "The simulated strategy was not selected because the evidence did not justify it as the final recovery direction."
+
+            strategy_cards_html = ""
+            for index, result in enumerate(simulated_strategies, start=1):
+                strategy = result.get("strategy") or {}
+                strategy_type = strategy.get("type")
+                description = strategy.get("description")
+                target_tasks = strategy.get("target_tasks") or []
+                status = result.get("status")
+                expected_effect = result.get("expected_effect")
+                risk = result.get("risk")
+                resource_impact = result.get("resource_impact")
+                affected_tasks = result.get("affected_tasks") or []
+                modified_tasks = result.get("modified_tasks") or []
+                before = result.get("before") or {}
+                after = result.get("after") or {}
+                result_comparison = result.get("comparison") or {}
+                assumptions = result.get("assumptions") or []
+                result_warnings = result.get("warnings") or []
+                is_selected = isinstance(selected_simulation, dict) and result == selected_simulation
+                selected_class = " selected" if is_selected else ""
+                target_html = "".join(f'<span>{_esc(task_id)}</span>' for task_id in target_tasks)
+                affected_html = "".join(f'<span>{_esc(task_id)}</span>' for task_id in affected_tasks)
+                modified_html = "".join(f'<span>{_esc(task_id)}</span>' for task_id in modified_tasks)
+                detail_html = (
+                    '<details class="uc-detail"><summary>Simulation details</summary>'
+                    + (f'<div class="uc-task-group"><small>Affected tasks</small><div class="uc-strategy-targets">{affected_html}</div></div>' if affected_html else '')
+                    + (f'<div class="uc-task-group"><small>Modified tasks</small><div class="uc-strategy-targets modified">{modified_html}</div></div>' if modified_html else '')
+                    + (f'<div class="uc-before-after"><div><small>Before</small><div class="uc-output-table">{_output_rows(before)}</div></div><div><small>After</small><div class="uc-output-table">{_output_rows(after)}</div></div></div>' if before or after else '')
+                    + (f'<div class="uc-output-table selected-changes"><small>Before / after comparison</small>{_output_rows(result_comparison)}</div>' if result_comparison else '')
+                    + (f'<div class="uc-agent-list"><small>Assumptions</small>{"".join(f"<p>{_esc(item)}</p>" for item in assumptions)}</div>' if assumptions else '')
+                    + (f'<div class="uc-agent-list warning"><small>Warnings</small>{"".join(f"<p>{_esc(item)}</p>" for item in result_warnings)}</div>' if result_warnings else '')
+                    + '</details>'
+                )
+                strategy_cards_html += (
+                    f'<article class="uc-strategy-card{selected_class}">'
+                    '<div class="uc-strategy-top">'
+                    f'<span class="uc-strategy-index">0{index}</span>'
+                    + (f'<span class="uc-strategy-status">{_esc(status)}</span>' if status else '')
+                    + '</div>'
+                    + (f'<div class="uc-strategy-type">{_esc(strategy_type)}</div>' if strategy_type else '')
+                    + (f'<div class="uc-strategy-desc">{_esc(description)}</div>' if description else '')
+                    + (f'<div class="uc-strategy-effect">{_esc(expected_effect)}</div>' if expected_effect else '')
+                    + (f'<div class="uc-strategy-targets"><small>Target tasks</small>{target_html}</div>' if target_html else '')
+                    + '<div class="uc-strategy-meta">'
+                    + (f'<span>Risk · {_esc(risk)}</span>' if risk else '')
+                    + (f'<span>Resources · {_esc(resource_impact)}</span>' if resource_impact else '')
+                    + '</div>'
+                    + detail_html
+                    + '</article>'
+                )
+
+            summary_cards_html = ""
+            if explanation:
+                summary_cards_html += (
+                    '<div class="uc-side-card">'
+                    '<div class="uc-side-title"><span>◉</span>Simulation conclusion</div>'
+                    f'<div class="uc-side-copy">{_esc(explanation)}</div>'
+                    '</div>'
+                )
+            if recovery_plan_summary:
+                summary_cards_html += (
+                    '<div class="uc-side-card recommended">'
+                    '<div class="uc-side-title"><span class="blue">◎</span>Recommended direction</div>'
+                    f'<div class="uc-side-copy">{_esc(recovery_plan_summary)}</div>'
+                    '</div>'
+                )
+            comparison_html = ""
+            for item in simulation_output.get("comparison") or []:
+                comparison_html += (
+                    '<article class="uc-compare-card">'
+                    f'<div class="uc-compare-type">{_esc(item.get("strategy_type"))}</div>'
+                    '<div class="uc-compare-grid">'
+                    f'<div><small>Effectiveness</small><strong>{_esc(item.get("effectiveness"))}</strong></div>'
+                    f'<div><small>Feasibility</small><strong>{_esc(item.get("feasibility"))}</strong></div>'
+                    f'<div><small>Risk</small><strong>{_esc(item.get("risk"))}</strong></div>'
+                    f'<div><small>Resources</small><strong>{_esc(item.get("resource_impact"))}</strong></div>'
+                    '</div>'
+                    f'<div class="uc-compare-summary">{_esc(item.get("summary"))}</div>'
+                    '</article>'
+                )
+
+            selected_decision_html = ""
+            if isinstance(selected_strategy, dict) or isinstance(selected_simulation, dict):
+                selected_targets = selected_strategy_payload.get("target_tasks") or []
+                selected_changes = selected_strategy_payload.get("changes") or {}
+                selected_target_html = "".join(f'<span>{_esc(item)}</span>' for item in selected_targets)
+                selected_status = selected_simulation.get("status") if isinstance(selected_simulation, dict) else None
+                selected_effect = selected_simulation.get("expected_effect") if isinstance(selected_simulation, dict) else None
+                selected_affected = selected_simulation.get("affected_tasks") or [] if isinstance(selected_simulation, dict) else []
+                selected_modified = selected_simulation.get("modified_tasks") or [] if isinstance(selected_simulation, dict) else []
+                selected_before = selected_simulation.get("before") or {} if isinstance(selected_simulation, dict) else {}
+                selected_after = selected_simulation.get("after") or {} if isinstance(selected_simulation, dict) else {}
+                selected_comparison = selected_simulation.get("comparison") or {} if isinstance(selected_simulation, dict) else {}
+                selected_risk = selected_simulation.get("risk") if isinstance(selected_simulation, dict) else None
+                selected_resources = selected_simulation.get("resource_impact") if isinstance(selected_simulation, dict) else None
+                selected_assumptions = selected_simulation.get("assumptions") or [] if isinstance(selected_simulation, dict) else []
+                selected_warnings = selected_simulation.get("warnings") or [] if isinstance(selected_simulation, dict) else []
+                selected_decision_html = (
+                    '<section class="uc-selected-panel">'
+                    '<div class="uc-section-eyebrow">FINAL DECISION</div>'
+                    '<div class="uc-selected-head">'
+                    '<div>'
+                    + (f'<div class="uc-strategy-type">{_esc(selected_type)}</div>' if selected_type else '')
+                    + (f'<div class="uc-section-title">{_esc(selected_description)}</div>' if selected_description else '')
+                    + '</div>'
+                    + (f'<span class="uc-strategy-status">{_esc(selected_status)}</span>' if selected_status else '')
+                    + '</div>'
+                    + (f'<div class="uc-strategy-effect">{_esc(selected_effect)}</div>' if selected_effect else '')
+                    + (f'<div class="uc-strategy-targets"><small>Target tasks</small>{selected_target_html}</div>' if selected_target_html else '')
+                    + '<div class="uc-strategy-meta">'
+                    + (f'<span>Risk · {_esc(selected_risk)}</span>' if selected_risk else '')
+                    + (f'<span>Resources · {_esc(selected_resources)}</span>' if selected_resources else '')
+                    + '</div>'
+                    + (f'<div class="uc-output-table selected-changes"><small>Changes</small>{_output_rows(selected_changes)}</div>' if selected_changes else '')
+                    + (f'<div class="uc-task-group"><small>Affected tasks</small><div class="uc-strategy-targets">{"".join(f"<span>{_esc(item)}</span>" for item in selected_affected)}</div></div>' if selected_affected else '')
+                    + (f'<div class="uc-task-group"><small>Modified tasks</small><div class="uc-strategy-targets modified">{"".join(f"<span>{_esc(item)}</span>" for item in selected_modified)}</div></div>' if selected_modified else '')
+                    + (f'<div class="uc-before-after"><div><small>Before</small><div class="uc-output-table">{_output_rows(selected_before)}</div></div><div><small>After</small><div class="uc-output-table">{_output_rows(selected_after)}</div></div></div>' if selected_before or selected_after else '')
+                    + (f'<div class="uc-output-table selected-changes"><small>Before / after comparison</small>{_output_rows(selected_comparison)}</div>' if selected_comparison else '')
+                    + (f'<div class="uc-agent-list"><small>Assumptions</small>{"".join(f"<p>{_esc(item)}</p>" for item in selected_assumptions)}</div>' if selected_assumptions else '')
+                    + (f'<div class="uc-agent-list warning"><small>Warnings</small>{"".join(f"<p>{_esc(item)}</p>" for item in selected_warnings)}</div>' if selected_warnings else '')
+                    + '</section>'
                 )
             else:
-                discarded_text = "No separate discarded strategy was returned by the Simulation Agent."
-
-            recommended_text = (
-                recovery_plan_summary
-                or selected_description
-                or explanation
-                or "No final recovery direction was returned by the Simulation Agent."
-            )
-
-            problem_title = "Project delayed by interconnected root blockers."
-            if analysis_output and isinstance(analysis_output, dict):
-                state = analysis_output.get("project_state")
-                root = analysis_output.get("root_cause") or {}
-                root_summary = root.get("summary") if isinstance(root, dict) else None
-                if root_summary:
-                    problem_title = str(root_summary)
-                elif state == "healthy":
-                    problem_title = "Project health signals are stable."
-                elif state == "uncertain":
-                    problem_title = "Project state requires additional evidence."
+                selected_decision_html = (
+                    '<section class="uc-selected-panel">'
+                    '<div class="uc-section-eyebrow">FINAL DECISION</div>'
+                    '<div class="uc-empty">No strategy or simulation result was selected by the Simulation Agent.</div>'
+                    '</section>'
+                )
 
             # Build roadmap from live recovery_execution_order.
             roadmap_html = ""
@@ -889,18 +1076,15 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
             for index, stage in enumerate(ordered_steps):
                 step = stage.get("step", index + 1)
                 task_ids = stage.get("task_ids") or []
-                action = stage.get("action") or "Recovery action"
-
-                # Derive a compact stage label while keeping the exact roadmap style.
-                stage_title = str(action).split(".")[0].strip()
-                if len(stage_title) > 28:
-                    stage_title = stage_title[:25].rstrip() + "..."
+                action = stage.get("action")
+                if not action:
+                    continue
 
                 roadmap_html += f"""
                     <div class="uc-flow-stage">
                         <div class="uc-flow-head">
                             <div class="uc-step-circle">{_esc(step)}</div>
-                            <div class="uc-step-title">{_esc(stage_title)}</div>
+                            <div class="uc-step-title">Step {_esc(step)}</div>
                         </div>
                         <div class="uc-stage-items">
                 """
@@ -916,7 +1100,6 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                 else:
                     roadmap_html += f"""
                         <div class="uc-flow-card">
-                            <div class="uc-task-id">Action</div>
                             <div class="uc-task-desc">{_esc(action)}</div>
                         </div>
                     """
@@ -929,146 +1112,67 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                             <div class="uc-flow-line">
                                 <span class="uc-flow-dot"></span>
                             </div>
-                            <span class="uc-flow-arrow">→</span>
                         </div>
                     """
-
-            metrics_html = ""
-            for card in metric_cards:
-                before = "—" if card["before"] is None else _esc(card["before"])
-                after = "—" if card["after"] is None else _esc(card["after"])
-                metrics_html += f"""
-                    <div class="uc-metric-card">
-                        <div class="uc-metric-label">
-                            <span class="uc-metric-icon">{_esc(card["icon"])}</span>
-                            <span>{_esc(card["label"])}</span>
-                        </div>
-                        <div class="uc-ba-row">
-                            <div>
-                                <span class="uc-small-label">Before</span>
-                                <span class="uc-big-value">{before}</span>
-                            </div>
-                            <span class="uc-ba-arrow">→</span>
-                            <div>
-                                <span class="uc-small-label">After</span>
-                                <span class="uc-big-value">{after}</span>
-                            </div>
-                        </div>
-                    </div>
-                """
 
             # st.html renders raw HTML directly, avoiding Markdown parsing
             # that can turn nested/indented HTML into visible code blocks.
             st.html(textwrap.dedent(f"""
                 <style>
                     .block-container {{
-                        max-width: 1440px !important;
-                        padding: 0 24px 56px !important;
+                        max-width: 1480px !important;
+                        padding: 24px 36px 72px !important;
                     }}
                     .stApp {{
-                        background: #ffffff !important;
-                        color: #111827 !important;
+                        background: #F8FAFE !important;
+                        color: #16223B !important;
                     }}
                     header[data-testid="stHeader"] {{
                         display: none !important;
                     }}
 
                     .uc-sim-root {{
-                        min-height: 100vh;
-                        background: #fff;
-                        color: #111827;
-                        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                    }}
-
-                    .uc-topbar {{
-                        position: sticky;
-                        top: 0;
-                        z-index: 50;
-                        height: 64px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        padding: 0 24px;
-                        margin: 0 -24px;
-                        background: rgba(255,255,255,.90);
-                        backdrop-filter: blur(12px);
-                        border-bottom: 1px solid #E5E7EB;
-                        box-shadow: 0 1px 4px rgba(17,24,39,.06);
-                    }}
-
-                    .uc-brand-wrap {{
-                        display: flex;
-                        align-items: center;
-                        gap: 12px;
-                    }}
-
-                    .uc-brand-icon {{
-                        width: 40px;
-                        height: 40px;
-                        border-radius: 8px;
-                        display: grid;
-                        place-items: center;
-                        background: #2563EB;
-                        color: #fff;
-                        font-size: 21px;
-                        font-weight: 800;
-                        box-shadow: 0 6px 14px rgba(37,99,235,.20);
-                    }}
-
-                    .uc-brand-name {{
-                        color: #111827;
-                        font-size: 20px;
-                        line-height: 1;
-                        font-weight: 900;
-                        letter-spacing: -.03em;
-                    }}
-
-                    .uc-brand-sub {{
-                        margin-top: 5px;
-                        color: #2563EB;
-                        font-size: 10px;
-                        font-weight: 800;
-                        letter-spacing: .12em;
-                        text-transform: uppercase;
-                    }}
-
-                    .uc-system-pill {{
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        padding: 6px 14px;
-                        border-radius: 999px;
-                        background: #EFF6FF;
-                        border: 1px solid #DBEAFE;
-                    }}
-
-                    .uc-system-dot {{
-                        width: 8px;
-                        height: 8px;
-                        border-radius: 50%;
-                        background: #2563EB;
-                        animation: ucPulse 1.8s ease-in-out infinite;
-                    }}
-
-                    .uc-system-text {{
-                        color: #374151;
-                        font-size: 11px;
-                        font-weight: 800;
-                        letter-spacing: .08em;
-                        text-transform: uppercase;
+                        min-height: 0;
+                        background: transparent;
+                        color: #16223B;
                     }}
 
                     .uc-main {{
-                        padding: 40px 0 0;
+                        padding: 8px 0 0;
                     }}
 
                     .uc-top-grid {{
+                        position: relative;
                         display: grid;
-                        grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr);
+                        grid-template-columns: 1fr;
                         gap: 32px;
+                        overflow: hidden;
+                        padding: 30px;
+                        border-radius: 24px;
+                        background: linear-gradient(128deg,#142542 0%,#29477F 58%,#514096 100%);
+                        box-shadow: 0 24px 50px rgba(29,49,96,.16);
+                    }}
+
+                    .uc-top-grid::before {{
+                        content: "";
+                        position: absolute;
+                        inset: 0;
+                        opacity: .22;
+                        background-image: linear-gradient(rgba(255,255,255,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.13) 1px,transparent 1px);
+                        background-size: 30px 30px;
+                        mask-image: linear-gradient(90deg,#000,transparent 78%);
+                        pointer-events: none;
+                    }}
+
+                    .uc-top-grid .uc-right {{
+                        display: grid;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        gap: 16px;
                     }}
 
                     .uc-left {{
+                        position: relative;
+                        z-index: 1;
                         display: flex;
                         flex-direction: column;
                         gap: 32px;
@@ -1079,113 +1183,43 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         align-items: center;
                         gap: 8px;
                         width: max-content;
-                        padding: 5px 12px;
+                        padding: 6px 9px;
                         margin-bottom: 16px;
-                        border-radius: 6px;
-                        background: #F3F4F6;
-                        color: #374151;
-                        border: 1px solid #E5E7EB;
-                        font-size: 11px;
-                        font-weight: 800;
-                        letter-spacing: .08em;
-                        text-transform: uppercase;
-                    }}
-
-                    .uc-kicker-icon {{
-                        color: #2563EB;
-                        font-size: 14px;
-                    }}
-
-                    .uc-problem-title {{
-                        margin: 0 0 16px;
-                        color: #111827;
-                        font-size: 31px;
-                        line-height: 1.2;
-                        font-weight: 900;
-                        letter-spacing: -.035em;
-                    }}
-
-                    .uc-problem-copy {{
-                        padding: 2px 0 2px 16px;
-                        border-left: 4px solid #2563EB;
-                        color: #4B5563;
-                        font-size: 16px;
-                        line-height: 1.75;
-                    }}
-
-                    .uc-section-heading {{
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        margin: 0 0 16px;
-                        padding-bottom: 8px;
-                        border-bottom: 1px solid #E5E7EB;
-                        color: #111827;
-                        font-size: 18px;
-                        font-weight: 800;
-                    }}
-
-                    .uc-metric-grid {{
-                        display: grid;
-                        grid-template-columns: repeat(4, minmax(0,1fr));
-                        gap: 16px;
-                    }}
-
-                    .uc-metric-card {{
-                        padding: 16px;
-                        border: 1px solid #E5E7EB;
-                        border-radius: 12px;
-                        background: #fff;
-                        box-shadow: 0 2px 8px rgba(17,24,39,.05);
-                    }}
-
-                    .uc-metric-label {{
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        min-height: 34px;
-                        margin-bottom: 12px;
-                        color: #6B7280;
-                        font-size: 11px;
-                        font-weight: 800;
+                        border-radius: 99px;
+                        background: rgba(255,255,255,.09);
+                        color: #C6D9FA;
+                        border: 1px solid rgba(220,232,255,.18);
+                        font-size: 10px;
+                        font-weight: 750;
                         letter-spacing: .06em;
                         text-transform: uppercase;
                     }}
 
-                    .uc-metric-icon {{
-                        color: #2563EB;
-                        font-size: 15px;
+                    .uc-kicker-icon {{
+                        color: #7DE5E0;
+                        font-size: 12px;
                     }}
 
-                    .uc-ba-row {{
-                        display: flex;
-                        align-items: flex-end;
-                        gap: 12px;
+                    .uc-problem-title {{
+                        margin: 0 0 16px;
+                        color: #FFFFFF;
+                        font-size: 32px;
+                        line-height: 1.18;
+                        font-weight: 780;
+                        letter-spacing: -.055em;
                     }}
 
-                    .uc-small-label {{
-                        display: block;
-                        color: #9CA3AF;
-                        font-size: 9px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                    }}
-
-                    .uc-big-value {{
-                        display: block;
-                        color: #111827;
-                        font-size: 25px;
-                        line-height: 1.1;
-                        font-weight: 900;
-                    }}
-
-                    .uc-ba-arrow {{
-                        margin-bottom: 4px;
-                        color: #D1D5DB;
-                        font-size: 17px;
+                    .uc-problem-copy {{
+                        padding: 2px 0 2px 16px;
+                        border-left: 3px solid #75D9D5;
+                        color: #CAD8F0;
+                        font-size: 13px;
+                        line-height: 1.7;
                     }}
 
                     .uc-right {{
+                        position: relative;
+                        z-index: 1;
                         display: flex;
                         flex-direction: column;
                         gap: 24px;
@@ -1194,11 +1228,12 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                     .uc-side-card {{
                         position: relative;
                         overflow: hidden;
-                        padding: 24px;
-                        border: 1px solid #E5E7EB;
+                        padding: 20px;
+                        border: 1px solid rgba(220,232,255,.18);
                         border-radius: 16px;
-                        background: #fff;
-                        box-shadow: 0 4px 15px rgba(17,24,39,.04);
+                        background: rgba(255,255,255,.08);
+                        backdrop-filter: blur(8px);
+                        box-shadow: 0 12px 28px rgba(9,20,48,.12);
                     }}
 
                     .uc-side-card::before {{
@@ -1208,16 +1243,16 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         bottom: 0;
                         left: 0;
                         width: 4px;
-                        background: #D1D5DB;
+                        background: #A9B8CB;
                     }}
 
                     .uc-side-card.recommended {{
-                        border-color: #BFDBFE;
-                        box-shadow: 0 8px 30px rgba(37,99,235,.08);
+                        border-color: rgba(116,224,214,.34);
+                        box-shadow: 0 12px 28px rgba(9,20,48,.14);
                     }}
 
                     .uc-side-card.recommended::before {{
-                        background: #2563EB;
+                        background: #4B88F5;
                     }}
 
                     .uc-side-title {{
@@ -1225,25 +1260,314 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         align-items: center;
                         gap: 8px;
                         margin-bottom: 12px;
-                        color: #111827;
-                        font-size: 16px;
-                        font-weight: 800;
+                        color: #FFFFFF;
+                        font-size: 14px;
+                        font-weight: 760;
                     }}
 
                     .uc-side-title .blue {{
-                        color: #2563EB;
+                        color: #4B88F5;
                     }}
 
                     .uc-side-copy {{
-                        color: #4B5563;
-                        font-size: 14px;
-                        line-height: 1.65;
+                        color: #CAD8F0;
+                        font-size: 12px;
+                        line-height: 1.7;
+                    }}
+
+                    .uc-strategy-section {{
+                        margin-top: 30px;
+                    }}
+
+                    .uc-section-head {{
+                        display: flex;
+                        align-items: end;
+                        justify-content: space-between;
+                        gap: 16px;
+                        margin-bottom: 14px;
+                    }}
+
+                    .uc-section-eyebrow {{
+                        color: #7185A6;
+                        font-size: 9px;
+                        font-weight: 820;
+                        letter-spacing: .14em;
+                        text-transform: uppercase;
+                    }}
+
+                    .uc-section-title {{
+                        margin-top: 5px;
+                        color: #182641;
+                        font-size: 20px;
+                        font-weight: 780;
+                        letter-spacing: -.03em;
+                    }}
+
+                    .uc-delay-chip {{
+                        padding: 7px 10px;
+                        border: 1px solid #DCE7F8;
+                        border-radius: 99px;
+                        background: #F2F7FF;
+                        color: #4266A6;
+                        font-size: 10px;
+                        font-weight: 760;
+                    }}
+
+                    .uc-strategy-grid {{
+                        display: grid;
+                        grid-template-columns: repeat(2,minmax(0,1fr));
+                        gap: 14px;
+                    }}
+
+                    .uc-strategy-card {{
+                        position: relative;
+                        overflow: hidden;
+                        min-height: 190px;
+                        padding: 20px;
+                        border: 1px solid #E3EAF6;
+                        border-radius: 18px;
+                        background: linear-gradient(145deg,#FFFFFF 0%,#F8FAFF 100%);
+                        box-shadow: 0 12px 28px rgba(27,55,97,.045);
+                    }}
+
+                    .uc-strategy-card::after {{
+                        content: "";
+                        position: absolute;
+                        right: -45px;
+                        bottom: -55px;
+                        width: 140px;
+                        height: 140px;
+                        border: 1px solid rgba(93,117,225,.12);
+                        border-radius: 50%;
+                        box-shadow: 0 0 0 22px rgba(93,117,225,.025);
+                    }}
+
+                    .uc-strategy-card.selected {{
+                        border-color: #9EC8F5;
+                        background: linear-gradient(145deg,#F7FBFF,#F4F0FF);
+                    }}
+
+                    .uc-strategy-card.selected::before {{
+                        content: "SELECTED";
+                        position: absolute;
+                        right: 18px;
+                        top: 18px;
+                        color: #3E70C6;
+                        font-size: 8px;
+                        font-weight: 850;
+                        letter-spacing: .12em;
+                    }}
+
+                    .uc-strategy-top {{
+                        display: flex;
+                        align-items: center;
+                        gap: 9px;
+                    }}
+
+                    .uc-strategy-index {{
+                        color: #A5B4CC;
+                        font-size: 10px;
+                        font-weight: 850;
+                        letter-spacing: .08em;
+                    }}
+
+                    .uc-strategy-status {{
+                        padding: 4px 7px;
+                        border-radius: 99px;
+                        background: #EBF8F4;
+                        color: #28816F;
+                        font-size: 8px;
+                        font-weight: 800;
+                        text-transform: uppercase;
+                    }}
+
+                    .uc-strategy-type {{
+                        position: relative;
+                        z-index: 1;
+                        margin-top: 15px;
+                        color: #2B5DB7;
+                        font-size: 10px;
+                        font-weight: 820;
+                        letter-spacing: .08em;
+                        text-transform: uppercase;
+                    }}
+
+                    .uc-strategy-desc {{
+                        position: relative;
+                        z-index: 1;
+                        margin-top: 7px;
+                        color: #253651;
+                        font-size: 13px;
+                        line-height: 1.55;
+                        font-weight: 700;
+                    }}
+
+                    .uc-strategy-effect {{
+                        position: relative;
+                        z-index: 1;
+                        margin-top: 9px;
+                        color: #73849D;
+                        font-size: 10px;
+                        line-height: 1.55;
+                    }}
+
+                    .uc-strategy-targets {{
+                        position: relative;
+                        z-index: 1;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 5px;
+                        margin-top: 12px;
+                    }}
+
+                    .uc-strategy-targets small,
+                    .uc-task-group > small,
+                    .uc-before-after small,
+                    .uc-agent-list small,
+                    .uc-output-table > small {{
+                        width: 100%;
+                        color: #92A0B4;
+                        font-size: 8px;
+                        font-weight: 800;
+                        letter-spacing: .08em;
+                        text-transform: uppercase;
+                    }}
+
+                    .uc-strategy-targets span {{
+                        padding: 4px 7px;
+                        border-radius: 99px;
+                        background: #EEF4FF;
+                        color: #4D69A0;
+                        font-size: 8px;
+                        font-weight: 760;
+                    }}
+
+                    .uc-strategy-targets.modified span {{
+                        background: #EAF9F5;
+                        color: #287B6B;
+                    }}
+
+                    .uc-strategy-meta {{
+                        position: relative;
+                        z-index: 1;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 12px;
+                        margin-top: 13px;
+                        padding-top: 10px;
+                        border-top: 1px solid #EBF0F7;
+                        color: #8897AC;
+                        font-size: 8px;
+                        font-weight: 720;
+                        text-transform: capitalize;
+                    }}
+
+                    .uc-detail {{
+                        position: relative;
+                        z-index: 2;
+                        margin-top: 14px;
+                        padding-top: 11px;
+                        border-top: 1px solid #EBF0F7;
+                    }}
+
+                    .uc-detail summary {{
+                        cursor: pointer;
+                        color: #4D6FA8;
+                        font-size: 9px;
+                        font-weight: 800;
+                        list-style: none;
+                    }}
+
+                    .uc-detail summary::after {{
+                        content: "+";
+                        float: right;
+                        color: #92A4C0;
+                    }}
+
+                    .uc-detail[open] summary::after {{ content: "−"; }}
+
+                    .uc-task-group {{ margin-top: 13px; }}
+
+                    .uc-before-after {{
+                        display: grid;
+                        grid-template-columns: repeat(2,minmax(0,1fr));
+                        gap: 10px;
+                        margin-top: 14px;
+                    }}
+
+                    .uc-before-after > div {{
+                        padding: 11px;
+                        border: 1px solid #E8EEF7;
+                        border-radius: 12px;
+                        background: #FBFCFF;
+                    }}
+
+                    .uc-output-table {{ margin-top: 7px; }}
+
+                    .uc-output-row {{
+                        display: flex;
+                        align-items: flex-start;
+                        justify-content: space-between;
+                        gap: 10px;
+                        padding: 6px 0;
+                        border-top: 1px solid #EEF2F7;
+                        color: #8190A5;
+                        font-size: 8px;
+                    }}
+
+                    .uc-output-row strong {{
+                        color: #41526D;
+                        font-size: 8px;
+                        text-align: right;
+                    }}
+
+                    .uc-agent-list {{
+                        margin-top: 12px;
+                        padding: 11px;
+                        border-radius: 12px;
+                        background: #F3F7FD;
+                    }}
+
+                    .uc-agent-list.warning {{ background: #FFF7EA; }}
+                    .uc-agent-list p {{ margin: 6px 0 0; color: #64758E; font-size: 9px; line-height: 1.5; }}
+
+                    .uc-comparison-section {{ margin-top: 30px; }}
+                    .uc-comparison-grid {{ display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }}
+                    .uc-compare-card {{ padding: 18px; border: 1px solid #E3EAF6; border-radius: 18px; background: #FFF; box-shadow: 0 10px 24px rgba(27,55,97,.04); }}
+                    .uc-compare-type {{ color: #2E5CB2; font-size: 11px; font-weight: 820; text-transform: uppercase; }}
+                    .uc-compare-grid {{ display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin-top: 12px; }}
+                    .uc-compare-grid > div {{ padding: 9px; border-radius: 10px; background: #F5F8FD; }}
+                    .uc-compare-grid small {{ display: block; color: #92A0B4; font-size: 7px; font-weight: 780; text-transform: uppercase; }}
+                    .uc-compare-grid strong {{ display: block; margin-top: 4px; color: #42536E; font-size: 9px; font-weight: 760; }}
+                    .uc-compare-summary {{ margin-top: 12px; color: #71829A; font-size: 10px; line-height: 1.6; }}
+
+                    .uc-selected-panel {{
+                        margin-top: 30px;
+                        padding: 22px;
+                        border: 1px solid #BFD5F5;
+                        border-radius: 20px;
+                        background: linear-gradient(145deg,#F8FBFF,#F5F1FF);
+                        box-shadow: 0 14px 30px rgba(45,82,150,.06);
+                    }}
+                    .uc-selected-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }}
+                    .uc-selected-panel .uc-section-title {{ max-width: 850px; font-size: 17px; line-height: 1.45; }}
+                    .selected-changes {{ margin-top: 14px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,.7); }}
+
+                    .uc-empty {{
+                        grid-column: 1 / -1;
+                        padding: 18px;
+                        border: 1px dashed #CBD9EC;
+                        border-radius: 14px;
+                        background: #F8FAFE;
+                        color: #7889A2;
+                        font-size: 10px;
+                        line-height: 1.55;
                     }}
 
                     .uc-roadmap-section {{
-                        margin-top: 64px;
-                        padding-top: 32px;
-                        border-top: 1px solid #E5E7EB;
+                        margin-top: 36px;
+                        padding-top: 28px;
+                        border-top: 1px solid #E5ECF7;
                     }}
 
                     .uc-roadmap-title {{
@@ -1251,16 +1575,16 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         align-items: center;
                         gap: 8px;
                         margin: 0;
-                        color: #111827;
-                        font-size: 24px;
-                        font-weight: 900;
-                        letter-spacing: -.03em;
+                        color: #182641;
+                        font-size: 20px;
+                        font-weight: 760;
+                        letter-spacing: -.025em;
                     }}
 
                     .uc-roadmap-sub {{
                         margin-top: 6px;
-                        color: #6B7280;
-                        font-size: 14px;
+                        color: #7B8BA2;
+                        font-size: 12px;
                     }}
 
                     .uc-flow-scroll {{
@@ -1333,36 +1657,36 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         position: relative;
                         z-index: 2;
                         padding: 16px;
-                        border: 2px solid #F3F4F6;
-                        border-radius: 12px;
+                        border: 1px solid #E5ECF7;
+                        border-radius: 16px;
                         background: #fff;
-                        box-shadow: 0 2px 7px rgba(17,24,39,.04);
+                        box-shadow: 0 10px 24px rgba(27,55,97,.04);
                         transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
                     }}
 
                     .uc-flow-card:hover {{
                         transform: translateY(-4px);
-                        border-color: #3B82F6;
-                        box-shadow: 0 6px 16px rgba(37,99,235,.10);
+                        border-color: #A9C4EE;
+                        box-shadow: 0 12px 26px rgba(27,55,97,.08);
                     }}
 
                     .uc-task-id {{
                         display: inline-flex;
                         padding: 2px 8px;
                         margin-bottom: 8px;
-                        border: 1px solid #E5E7EB;
+                        border: 1px solid #E5ECF7;
                         border-radius: 5px;
-                        background: #F9FAFB;
-                        color: #374151;
+                        background: #F3F7FC;
+                        color: #5F718B;
                         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
                         font-size: 11px;
                         font-weight: 800;
                     }}
 
                     .uc-task-desc {{
-                        color: #4B5563;
-                        font-size: 13px;
-                        line-height: 1.45;
+                        color: #60718A;
+                        font-size: 12px;
+                        line-height: 1.55;
                     }}
 
                     .uc-flow-connector {{
@@ -1379,7 +1703,7 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         position: relative;
                         width: 100%;
                         height: 2px;
-                        background: #E5E7EB;
+                        background: #DEE6F3;
                     }}
 
                     .uc-flow-dot {{
@@ -1390,26 +1714,18 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         height: 8px;
                         transform: translateY(-50%);
                         border-radius: 50%;
-                        background: #3B82F6;
+                        background: #4B88F5;
                         animation: ucFlowRight 2s linear infinite;
-                    }}
-
-                    .uc-flow-arrow {{
-                        position: absolute;
-                        right: -5px;
-                        color: #D1D5DB;
-                        background: #fff;
-                        font-size: 22px;
                     }}
 
                     .uc-order-note {{
                         margin-top: -24px;
                         padding: 16px 18px;
-                        border: 1px solid #E5E7EB;
-                        border-radius: 12px;
-                        background: #FAFAFA;
-                        color: #4B5563;
-                        font-size: 13px;
+                        border: 1px solid #E5ECF7;
+                        border-radius: 16px;
+                        background: #FFFFFF;
+                        color: #60718A;
+                        font-size: 12px;
                         line-height: 1.6;
                     }}
 
@@ -1418,11 +1734,6 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                         20% {{ opacity: 1; }}
                         80% {{ opacity: 1; }}
                         100% {{ left: 100%; opacity: 0; }}
-                    }}
-
-                    @keyframes ucPulse {{
-                        0%,100% {{ opacity: 1; }}
-                        50% {{ opacity: .35; }}
                     }}
 
                     @media (max-width: 1100px) {{
@@ -1436,88 +1747,29 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                     }}
 
                     @media (max-width: 760px) {{
-                        .uc-system-pill {{
-                            display: none;
+                        .block-container {{
+                            padding: 20px 18px 52px !important;
                         }}
                         .uc-problem-title {{
                             font-size: 26px;
                         }}
-                        .uc-metric-grid {{
-                            grid-template-columns: repeat(2,minmax(0,1fr));
-                        }}
                         .uc-right {{
                             grid-template-columns: 1fr;
                         }}
-                    }}
-
-                    @media (max-width: 520px) {{
-                        .uc-metric-grid {{
+                        .uc-strategy-grid {{
                             grid-template-columns: 1fr;
                         }}
+                        .uc-comparison-grid {{ grid-template-columns: 1fr; }}
+                        .uc-compare-grid {{ grid-template-columns: repeat(2,minmax(0,1fr)); }}
+                        .uc-before-after {{ grid-template-columns: 1fr; }}
                     }}
                 </style>
 
                 <div class="uc-sim-root">
-                    <div class="uc-topbar">
-                        <div class="uc-brand-wrap">
-                            <div class="uc-brand-icon">⌁</div>
-                            <div>
-                                <div class="uc-brand-name">Under Control</div>
-                                <div class="uc-brand-sub">AI Recovery Agent</div>
-                            </div>
-                        </div>
-                        <div class="uc-system-pill">
-                            <span class="uc-system-dot"></span>
-                            <span class="uc-system-text">System Active</span>
-                        </div>
-                    </div>
-
                     <main class="uc-main">
                         <div class="uc-top-grid">
-                            <div class="uc-left">
-                                <section>
-                                    <div class="uc-kicker">
-                                        <span class="uc-kicker-icon">⚡</span>
-                                        Problem Identification
-                                    </div>
-
-                                    <h1 class="uc-problem-title">{_esc(problem_title)}</h1>
-
-                                    <div class="uc-problem-copy">
-                                        {_esc(identified_problem or explanation or "No simulation problem statement was returned.")}
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <h2 class="uc-section-heading">
-                                        Simulation Results: Target {_esc(target_label)}
-                                    </h2>
-                                    <div class="uc-metric-grid">
-                                        {metrics_html}
-                                    </div>
-                                </section>
-                            </div>
-
                             <div class="uc-right">
-                                <div class="uc-side-card">
-                                    <div class="uc-side-title">
-                                        <span>◉</span>
-                                        Strategy Discarded
-                                    </div>
-                                    <div class="uc-side-copy">
-                                        {_esc(discarded_text)}
-                                    </div>
-                                </div>
-
-                                <div class="uc-side-card recommended">
-                                    <div class="uc-side-title">
-                                        <span class="blue">◎</span>
-                                        Recommended Direction
-                                    </div>
-                                    <div class="uc-side-copy">
-                                        {_esc(recommended_text)}
-                                    </div>
-                                </div>
+                                {summary_cards_html}
                             </div>
                         </div>
 
@@ -1526,17 +1778,13 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                                 <span style="color:#2563EB">⑂</span>
                                 Recovery Execution Order
                             </h2>
-                            <div class="uc-roadmap-sub">
-                                Interactive roadmap. Nodes stacked vertically indicate tasks that can proceed in parallel.
-                            </div>
-
                             <div class="uc-flow-scroll">
                                 <div class="uc-flow">
-                                    {roadmap_html if roadmap_html else '<div class="uc-side-copy">No recovery execution order was returned.</div>'}
+                                    {roadmap_html}
                                 </div>
                             </div>
 
-                            {f'<div class="uc-order-note"><strong>Why this order:</strong> {_esc(recovery_order_reason)}</div>' if recovery_order_reason else ''}
+                            {f'<div class="uc-order-note">{_esc(recovery_order_reason)}</div>' if recovery_order_reason else ''}
                         </section>
                     </main>
                 </div>
@@ -1545,13 +1793,12 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
             simulation_assumptions = simulation_output.get("assumptions") or []
             simulation_warnings = simulation_output.get("warnings") or []
 
-            if simulation_assumptions or simulation_warnings:
-                with st.expander("Simulation assumptions and warnings", expanded=False):
-                    if simulation_assumptions:
-                        st.write("Assumptions")
-                        for assumption in simulation_assumptions:
-                            st.write("• " + str(assumption))
-                    if simulation_warnings:
-                        st.write("Warnings")
-                        for warning in simulation_warnings:
-                            st.write("• " + str(warning))
+            with st.expander("Simulation assumptions and warnings", expanded=False):
+                if simulation_assumptions:
+                    st.write("Assumptions")
+                    for assumption in simulation_assumptions:
+                        st.write("• " + str(assumption))
+                if simulation_warnings:
+                    st.write("Warnings")
+                    for warning in simulation_warnings:
+                        st.write("• " + str(warning))

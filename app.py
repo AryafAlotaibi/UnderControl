@@ -1611,11 +1611,143 @@ st.markdown(
         border-color: #FECACA;
     }
 
+    /* File actions: one quiet destructive action and one clear next step. */
+    .st-key-remove_selected_file button {
+        width: 100% !important;
+        min-height: 46px !important;
+        margin: 10px 0 0 !important;
+        padding: 0 16px !important;
+        color: #7B8BA2 !important;
+        background: rgba(255,255,255,.72) !important;
+        border: 1px solid #E3EAF5 !important;
+        border-radius: 14px !important;
+        box-shadow: none !important;
+        transition: color .2s ease, background .2s ease, border-color .2s ease !important;
+    }
+    .st-key-remove_selected_file button:hover {
+        color: #C94A5A !important;
+        background: #FFF7F8 !important;
+        border-color: #F2C9D0 !important;
+        transform: none !important;
+    }
+    .st-key-analyze_project button {
+        position: relative;
+        width: 100% !important;
+        min-height: 46px !important;
+        margin: 10px 0 0 !important;
+        padding: 0 22px !important;
+        overflow: hidden;
+        color: #FFFFFF !important;
+        background: linear-gradient(110deg,#315EE8 0%,#6377EC 52%,#477BCB 100%) !important;
+        background-size: 180% 100% !important;
+        border: 0 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 12px 26px rgba(58,91,210,.22) !important;
+        font-size: 13px !important;
+        font-weight: 750 !important;
+        letter-spacing: .01em !important;
+        transition: transform .2s ease, box-shadow .2s ease, background-position .35s ease !important;
+    }
+    .st-key-analyze_project button:hover {
+        color: #FFFFFF !important;
+        background-position: 100% 0 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 16px 32px rgba(58,91,210,.29) !important;
+    }
+    .st-key-analyze_project button:focus-visible,
+    .st-key-remove_selected_file button:focus-visible {
+        outline: 2px solid #6E8FF1 !important;
+        outline-offset: 3px !important;
+    }
+
+    /* Lightweight analysis journey shown while the pipeline is running. */
+    .analysis-motion {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 26px 0 10px;
+        text-align: center;
+    }
+    .analysis-orbit {
+        position: relative;
+        width: 82px;
+        height: 82px;
+        margin-bottom: 17px;
+        border: 1px solid #DCE7FA;
+        border-radius: 50%;
+        animation: analysis-spin 3.6s linear infinite;
+    }
+    .analysis-orbit::before {
+        content: "";
+        position: absolute;
+        inset: 13px;
+        border: 1px solid #C7D9F8;
+        border-radius: 50%;
+        animation: analysis-spin 2.4s linear infinite reverse;
+    }
+    .analysis-core {
+        position: absolute;
+        inset: 25px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        color: #FFFFFF;
+        background: linear-gradient(145deg,#4B88F5,#7567E8);
+        box-shadow: 0 0 0 8px rgba(85,116,232,.08),0 10px 25px rgba(64,89,190,.22);
+        animation: analysis-spin 3.6s linear infinite reverse;
+    }
+    .analysis-dot {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #55C7C1;
+        box-shadow: 0 0 0 4px rgba(85,199,193,.10);
+    }
+    .analysis-dot.one { top: -4px; left: 35px; }
+    .analysis-dot.two { right: 2px; bottom: 9px; background:#7D73EB; }
+    .analysis-motion-title { color:#182641; font-size:15px; font-weight:760; }
+    .analysis-motion-detail { max-width:500px; margin-top:5px; color:#8492A8; font-size:11px; line-height:1.55; }
+    .analysis-phases { display:flex; align-items:center; gap:8px; margin-top:15px; }
+    .analysis-phases span { color:#A2AFC1; font-size:9px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+    .analysis-phases span.active { color:#4F6ED0; }
+    .analysis-phases i { width:20px; height:1px; background:#DCE5F3; }
+    @keyframes analysis-spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 540px) {
+        .st-key-remove_selected_file button,
+        .st-key-analyze_project button { min-height: 44px !important; }
+    }
+
 
 </style>
 """,
     unsafe_allow_html=True
 )
+
+
+def analysis_motion_html(title, detail, active_step):
+    """Render the current pipeline stage without Streamlit's boxed status UI."""
+    phases = ("Read", "Understand", "Simulate")
+    phase_html = []
+    for index, phase in enumerate(phases):
+        phase_html.append(
+            f'<span class="{"active" if index <= active_step else ""}">{phase}</span>'
+        )
+        if index < len(phases) - 1:
+            phase_html.append("<i></i>")
+    return (
+        '<div class="analysis-motion">'
+        '<div class="analysis-orbit">'
+        '<span class="analysis-dot one"></span>'
+        '<span class="analysis-dot two"></span>'
+        '<div class="analysis-core">⌁</div>'
+        '</div>'
+        f'<div class="analysis-motion-title">{html.escape(title)}</div>'
+        f'<div class="analysis-motion-detail">{html.escape(detail)}</div>'
+        f'<div class="analysis-phases">{"".join(phase_html)}</div>'
+        '</div>'
+    )
 
 
 # =========================================================
@@ -1677,18 +1809,23 @@ if uploaded_file is not None:
             unsafe_allow_html=True,
         )
 
-        st.button(
-            "× Remove selected file",
-            key="remove_selected_file",
-            on_click=clear_uploaded_file,
-        )
+        remove_column, analyze_column = st.columns([1, 3], gap="small")
+        with remove_column:
+            st.button(
+                "× Remove",
+                key="remove_selected_file",
+                on_click=clear_uploaded_file,
+                use_container_width=True,
+            )
+        with analyze_column:
+            analyze_clicked = st.button(
+                "Analyze project  →",
+                key="analyze_project",
+                type="primary",
+                use_container_width=True,
+            )
 
-        if st.button(
-            "Analyze Project",
-            key="analyze_project",
-            type="primary",
-            use_container_width=True,
-        ):
+        if analyze_clicked:
             clear_analysis_result()
             try:
                 user_df = read_uploaded_csv(uploaded_file)
@@ -1697,38 +1834,52 @@ if uploaded_file is not None:
             except (ValueError, pd.errors.ParserError, pd.errors.EmptyDataError) as error:
                 st.warning(str(error))
             else:
+                analysis_motion = st.empty()
                 try:
                     # The backend receives the original upload, unchanged.
-                    with st.status("Analyzing your project...", expanded=True) as analysis_status:
-                        st.write(f"File read successfully: {len(user_df):,} tasks.")
-                        started = perf_counter()
-                        with st.spinner("Preparing analysis tools...", show_time=True):
-                            from pipeline.pipeline import run_analysis
-                        tools_ready = perf_counter()
-                        with st.spinner(
-                            "Analyzing the project and simulating recovery strategies. Please keep this page open...",
-                            show_time=True,
-                        ):
-                            pipeline_result = run_analysis(user_df)
-                        analysis_finished = perf_counter()
-                        timing_logger = logging.getLogger("undercontrol.ui.timing")
-                        timing_logger.setLevel(logging.INFO)
-                        timing_logger.info(
-                            "Analysis tools loaded in %.1fs; backend pipeline completed in %.1fs",
-                            tools_ready - started,
-                            analysis_finished - tools_ready,
-                        )
-                        analysis_status.update(
-                            label="Analysis and simulation completed. Preparing your dashboard...",
-                            state="complete",
-                            expanded=False,
-                        )
+                    analysis_motion.markdown(
+                        analysis_motion_html(
+                            "Reading your project",
+                            f"{len(user_df):,} tasks received. Preparing the analysis workspace.",
+                            0,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    started = perf_counter()
+                    from pipeline.pipeline import run_analysis
+                    tools_ready = perf_counter()
+                    analysis_motion.markdown(
+                        analysis_motion_html(
+                            "Finding the project story",
+                            "The agents are connecting risks, blockers and recovery options.",
+                            1,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    pipeline_result = run_analysis(user_df)
+                    analysis_finished = perf_counter()
+                    timing_logger = logging.getLogger("undercontrol.ui.timing")
+                    timing_logger.setLevel(logging.INFO)
+                    timing_logger.info(
+                        "Analysis tools loaded in %.1fs; backend pipeline completed in %.1fs",
+                        tools_ready - started,
+                        analysis_finished - tools_ready,
+                    )
+                    analysis_motion.markdown(
+                        analysis_motion_html(
+                            "Your project view is ready",
+                            "Opening the analysis and recovery path.",
+                            2,
+                        ),
+                        unsafe_allow_html=True,
+                    )
 
                     if not isinstance(pipeline_result, dict):
                         raise RuntimeError("No structured pipeline result was returned.")
 
                     analysis_result = pipeline_result.get("analysis")
                     simulation_result = pipeline_result.get("simulation")
+                    project_dataframe = pipeline_result.get("project_dataframe")
 
                     if hasattr(analysis_result, "model_dump"):
                         analysis_result = analysis_result.model_dump()
@@ -1742,15 +1893,17 @@ if uploaded_file is not None:
                     if not isinstance(simulation_result, dict) or not simulation_result:
                         raise RuntimeError("No structured simulation was returned.")
 
-                    st.session_state["project_dataframe"] = (
-                        dashboard_white_ui.prepare_dashboard_data(user_df)
-                    )
+                    if not isinstance(project_dataframe, pd.DataFrame):
+                        raise RuntimeError("No standardized project data was returned.")
+
+                    st.session_state["project_dataframe"] = project_dataframe.copy()
                     st.session_state["analysis_output"] = analysis_result
                     st.session_state["simulation_output"] = simulation_result
                     st.session_state["analyzed_filename"] = uploaded_file.name
                     st.query_params["view"] = "analysis"
                     st.rerun()
                 except Exception:
+                    analysis_motion.empty()
                     clear_analysis_result()
                     logging.getLogger(__name__).exception("Project analysis failed")
                     st.error("We couldn't complete the analysis because of a technical problem. Please try again. If the problem continues, contact your project administrator.")

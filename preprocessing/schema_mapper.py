@@ -385,11 +385,6 @@ class SchemaMapper:
             ],
             response_format={
                 "type": "json_object"
-            },
-            extra_body={
-                "reasoning": {
-                    "effort": "low"
-                }
             }
         )
 
