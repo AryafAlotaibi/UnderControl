@@ -639,11 +639,11 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
         delay = analysis_output.get("estimated_delay_days")
         if warnings:
             warning_html = "<br>".join(html.escape(str(item)) for item in dict.fromkeys(warnings))
-            st.markdown(
-                '<div class="data-note"><span>◇</span><div><strong>Data note</strong><br>'
-                f'{warning_html}</div></div>',
-                unsafe_allow_html=True,
-            )
+            # st.markdown(
+            #     '<div class="data-note"><span>◇</span><div><strong>Data note</strong><br>'
+            #     f'{warning_html}</div></div>',
+            #     unsafe_allow_html=True,
+            # )
 
         agent_notes = []
         for note in analysis_output.get("notes") or []:
@@ -655,11 +655,11 @@ def render_dashboard_ui(analysis_output=None, simulation_output=None, project_df
                 f"<li>{html.escape(note)}</li>"
                 for note in dict.fromkeys(agent_notes)
             )
-            st.markdown(
-                '<div class="agent-note"><span>✦</span><div><strong>Project note</strong>'
-                f'<ul>{notes_html}</ul></div></div>',
-                unsafe_allow_html=True,
-            )
+            # st.markdown(
+            #     '<div class="agent-note"><span>✦</span><div><strong>Project note</strong>'
+            #     f'<ul>{notes_html}</ul></div></div>',
+            #     unsafe_allow_html=True,
+            # )
 
         if delay is not None:
             st.caption(f"Estimated project delay: {delay:g} days")
