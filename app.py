@@ -782,6 +782,8 @@
 import io
 import logging
 import hashlib
+import json
+from pathlib import Path
 from time import perf_counter
 import pandas as pd
 
@@ -795,6 +797,8 @@ import dashboard_white_ui
 
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+DEV_PREVIEW = False  # Set to True to enable local development preview of the last successful analysis
+DEV_STATE_PATH = Path(__file__).with_name(".under_control_dev_state.json")
 
 
 def clear_uploaded_file():
@@ -802,6 +806,8 @@ def clear_uploaded_file():
     st.session_state["uploader_version"] = st.session_state.get("uploader_version", 0) + 1
     clear_analysis_result()
     st.session_state.pop("uploaded_fingerprint", None)
+    if DEV_PREVIEW:
+        DEV_STATE_PATH.unlink(missing_ok=True)
 
 
 def clear_analysis_result():
@@ -814,6 +820,46 @@ def clear_analysis_result():
         st.session_state.pop(key, None)
     for key in ("dashboard_project", "dashboard_status", "dashboard_priority"):
         st.session_state.pop(key, None)
+
+
+def save_dev_preview(analysis_result, simulation_result, project_dataframe, filename):
+    """Persist the latest successful result for local UI development."""
+    if not DEV_PREVIEW:
+        return
+    payload = {
+        "analysis_output": analysis_result,
+        "simulation_output": simulation_result,
+        "project_dataframe": project_dataframe.to_json(orient="split", date_format="iso"),
+        "analyzed_filename": filename,
+    }
+    temporary_path = DEV_STATE_PATH.with_suffix(".tmp")
+    temporary_path.write_text(
+        json.dumps(payload, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+    temporary_path.replace(DEV_STATE_PATH)
+
+
+def restore_dev_preview():
+    """Restore the last result unless the user explicitly opened Upload."""
+    if not DEV_PREVIEW or st.session_state.get("analysis_output"):
+        return
+    if st.query_params.get("view") == "upload" or not DEV_STATE_PATH.exists():
+        return
+    try:
+        payload = json.loads(DEV_STATE_PATH.read_text(encoding="utf-8"))
+        project_dataframe = pd.read_json(
+            io.StringIO(payload["project_dataframe"]),
+            orient="split",
+        )
+        st.session_state["analysis_output"] = payload["analysis_output"]
+        st.session_state["simulation_output"] = payload["simulation_output"]
+        st.session_state["project_dataframe"] = project_dataframe
+        st.session_state["analyzed_filename"] = payload.get("analyzed_filename", "Development preview")
+        st.query_params["view"] = "analysis"
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        logging.getLogger(__name__).exception("Could not restore the development preview")
+        DEV_STATE_PATH.unlink(missing_ok=True)
 
 
 def read_uploaded_csv(uploaded_file):
@@ -842,6 +888,96 @@ def read_uploaded_csv(uploaded_file):
 
     raise ValueError(
         "The CSV file could not be read. Please upload a valid project CSV file."
+    )
+
+
+
+def render_route_transition_overlay():
+    """Cover the old Upload DOM while Streamlit builds the Analysis page."""
+    st.markdown(
+        """
+        <style>
+        .uc-route-transition {
+            position: fixed;
+            inset: 0;
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background:
+                linear-gradient(118deg, rgba(94,130,235,.08) 0%, rgba(94,130,235,0) 24%),
+                linear-gradient(302deg, rgba(157,122,224,.08) 0%, rgba(157,122,224,0) 25%),
+                radial-gradient(ellipse at 50% 22%, rgba(255,255,255,.99) 0%, rgba(255,255,255,.90) 42%, rgba(247,248,252,.96) 100%);
+            opacity: 1;
+            transition: opacity .18s ease;
+            pointer-events: all;
+        }
+
+        .uc-route-transition__card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 24px 28px;
+            border: 1px solid rgba(215,219,240,.78);
+            border-radius: 22px;
+            background: rgba(255,255,255,.78);
+            box-shadow: 0 20px 54px rgba(77,83,155,.10);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .uc-route-transition__mark {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            color: #FFFFFF;
+            font-size: 19px;
+            font-weight: 800;
+            background: linear-gradient(135deg,#6678E8 0%,#7A67DF 100%);
+            box-shadow: 0 10px 24px rgba(102,120,232,.20);
+        }
+
+        .uc-route-transition__title {
+            color: #18223C;
+            font-size: 16px;
+            font-weight: 750;
+            line-height: 1.25;
+        }
+
+        .uc-route-transition__text {
+            color: #8793AA;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        </style>
+
+        <div class="uc-route-transition" id="uc-route-transition">
+            <div class="uc-route-transition__card">
+                <div class="uc-route-transition__mark">✓</div>
+                <div class="uc-route-transition__title">Analysis ready</div>
+                <div class="uc-route-transition__text">Opening your project view…</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def hide_route_transition_overlay():
+    """Fade the transition cover only after the dashboard has finished rendering."""
+    st.markdown(
+        """
+        <style>
+        #uc-route-transition {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -929,6 +1065,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+restore_dev_preview()
+
+_route_transition_target = st.session_state.get("route_transition_target")
+if (
+    _route_transition_target == "analysis"
+    and st.query_params.get("view") == "analysis"
+):
+    render_route_transition_overlay()
+
 active_stage = render_workflow_navigation()
 if active_stage in ("analysis", "simulation"):
     importlib.reload(dashboard_white_ui)
@@ -939,6 +1084,9 @@ if active_stage in ("analysis", "simulation"):
         source_name=st.session_state.get("analyzed_filename"),
         active_stage=active_stage,
     )
+    if _route_transition_target == active_stage:
+        hide_route_transition_overlay()
+        st.session_state.pop("route_transition_target", None)
     st.stop()
 
 
@@ -960,7 +1108,7 @@ st.markdown(
 
     .block-container {
         max-width: 820px;
-        padding-top: 55px;
+        padding-top: 22px;
         padding-bottom: 70px;
     }
 
@@ -1328,12 +1476,61 @@ st.markdown(
         font-weight: 400 !important;
     }
 
-    /* Subtle editorial details that keep the page focused on one action. */
+    /* Shared Aurora application canvas: same visual treatment as Analysis/Simulation. */
+    html, body, [class*="css"] {
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
     .stApp {
         background:
-            radial-gradient(circle at 50% 15%, rgba(219, 234, 254, 0.46), transparent 25rem),
-            linear-gradient(180deg, #FFFFFF 0%, #FBFDFF 100%);
+            linear-gradient(118deg, rgba(94,130,235,.085) 0%, rgba(94,130,235,0) 24%),
+            linear-gradient(302deg, rgba(157,122,224,.085) 0%, rgba(157,122,224,0) 25%),
+            radial-gradient(ellipse at 50% 18%, rgba(255,255,255,.98) 0%, rgba(255,255,255,.74) 34%, rgba(255,255,255,0) 68%),
+            linear-gradient(180deg,#F8F9FD 0%,#F5F7FC 55%,#F7F8FC 100%);
+        background-attachment: fixed;
+        background-repeat: no-repeat;
     }
+
+    .stApp::before,
+    .stApp::after {
+        content: "";
+        position: fixed;
+        z-index: 0;
+        pointer-events: none;
+        filter: blur(22px);
+        opacity: .42;
+    }
+
+    .stApp::before {
+        width: 280px;
+        height: 520px;
+        left: -150px;
+        top: 18%;
+        border-radius: 46% 54% 60% 40% / 42% 46% 54% 58%;
+        background: linear-gradient(180deg, rgba(98,145,239,.16), rgba(127,177,246,.05));
+    }
+
+    .stApp::after {
+        width: 340px;
+        height: 560px;
+        right: -180px;
+        top: 8%;
+        border-radius: 58% 42% 45% 55% / 44% 58% 42% 56%;
+        background: linear-gradient(180deg, rgba(151,120,222,.14), rgba(113,153,240,.04));
+    }
+
+    .stApp > div {
+        position: relative;
+        z-index: 1;
+    }
+    .brand { font-size:14px; }
+    .main-title { font-size:38px; }
+    .subtitle { font-size:17px; line-height:1.65; }
+    div[data-testid="stFileUploaderDropzoneInstructions"] span { font-size:14px !important; line-height:1.55 !important; }
+    .upload-note { font-size:12px; }
+    .intake-kicker { font-size:11px; }
+    .analysis-motion-title { font-size:17px; }
+    .analysis-motion-detail { font-size:13px; }
 
     .brand {
         display: flex;
@@ -1720,6 +1917,390 @@ st.markdown(
     }
 
 
+
+    /* Keep the Upload workflow header visually identical to Analysis/Simulation. */
+    .workflow-brand {
+        text-align: center !important;
+        color: #345EE9 !important;
+        font-size: 26px !important;
+        font-weight: 750 !important;
+        line-height: 1.3 !important;
+        letter-spacing: .08em !important;
+        margin: 4px 0 24px !important;
+    }
+
+    .st-key-workflow_navigation {
+        max-width: 740px !important;
+        margin: 0 auto 22px !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .st-key-workflow_navigation [data-testid="stButton"] > button {
+        margin: 0 !important;
+    }
+
+    .st-key-workflow_navigation .st-key-workflow_previous button,
+    .st-key-workflow_navigation .st-key-workflow_next button {
+        color: #4F6ED0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .st-key-workflow_navigation .st-key-workflow_previous button:hover,
+    .st-key-workflow_navigation .st-key-workflow_next button:hover {
+        color: #4F6ED0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+
+    /* =========================================================
+       UPLOAD PALETTE — match Analysis / Simulation
+       Frontend colors only. No layout, data, or behavior changes.
+       ========================================================= */
+
+    .main-title {
+        color: #18223C !important;
+    }
+
+    .subtitle {
+        color: #7F8BA4 !important;
+    }
+
+    .intake-kicker {
+        color: #7577B2 !important;
+    }
+
+    .intake-kicker::before,
+    .intake-kicker::after {
+        background: linear-gradient(90deg, transparent, #B8B8EC) !important;
+    }
+
+    .brand::before {
+        background: #6678E8 !important;
+        box-shadow: 0 0 0 5px rgba(102,120,232,.10) !important;
+    }
+
+    .upload-note {
+        border-color: #E2E2F5 !important;
+        color: #747F99 !important;
+        background: rgba(255,255,255,.80) !important;
+    }
+
+    .upload-note strong {
+        color: #7168DF !important;
+    }
+
+    .selected-file {
+        border-color: #DEDEF2 !important;
+        box-shadow: 0 8px 22px rgba(91,83,178,.07) !important;
+    }
+
+    .selected-file::after {
+        background: linear-gradient(180deg,#6678E8,#7A67DF) !important;
+    }
+
+    .file-badge,
+    .file-icon {
+        color: #665FD6 !important;
+        background: #F0EFFF !important;
+    }
+
+    .file-info {
+        border-color: #DEDEF2 !important;
+        box-shadow: 0 4px 15px rgba(91,83,178,.055) !important;
+    }
+
+    div[data-testid="stFileUploader"] section {
+        background-color: #F8F7FF !important;
+        background-image:
+            linear-gradient(rgba(102,120,232,.028) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(122,103,223,.028) 1px, transparent 1px),
+            radial-gradient(circle at 14% 88%, rgba(109,137,232,.13), transparent 10rem),
+            radial-gradient(circle at 88% 12%, rgba(155,121,229,.14), transparent 12rem) !important;
+        border-color: #CFCDF3 !important;
+        box-shadow:
+            0 24px 60px rgba(91,83,178,.10),
+            inset 0 1px 0 rgba(255,255,255,.94) !important;
+    }
+
+    div[data-testid="stFileUploader"] section:hover {
+        background-color: #FAF9FF !important;
+        border-color: #8A7BE3 !important;
+        box-shadow:
+            0 26px 62px rgba(91,83,178,.14),
+            inset 0 1px 0 rgba(255,255,255,.96) !important;
+    }
+
+    div[data-testid="stFileUploader"]::before,
+    div[data-testid="stFileUploader"]::after {
+        color: #777BB0 !important;
+    }
+
+    div[data-testid="stFileUploader"] section::before {
+        background-color: #6D72DF !important;
+        background-image:
+            linear-gradient(145deg, rgba(255,255,255,.28), transparent 45%),
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V3'/%3E%3Cpath d='m7 8 5-5 5 5'/%3E%3Cpath d='M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4'/%3E%3C/svg%3E") !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        box-shadow:
+            0 13px 25px rgba(91,83,178,.23),
+            0 0 0 8px rgba(122,103,223,.065) !important;
+    }
+
+    div[data-testid="stFileUploader"] button {
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg,#6678E8 0%,#7A67DF 100%) !important;
+        border-color: #7168DF !important;
+        box-shadow: 0 10px 20px rgba(91,83,178,.18) !important;
+    }
+
+    div[data-testid="stFileUploader"] button:hover {
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg,#5D70DE 0%,#6F5BD1 100%) !important;
+        border-color: #6F5BD1 !important;
+        box-shadow: 0 14px 26px rgba(91,83,178,.24) !important;
+    }
+
+    div[data-testid="stFileUploader"] button:focus-visible {
+        outline-color: rgba(122,103,223,.24) !important;
+    }
+
+    .workflow {
+        border-color: #E2E2F3 !important;
+        box-shadow: 0 10px 28px rgba(91,83,178,.04) !important;
+    }
+
+    .workflow-icon {
+        background: #F0EFFF !important;
+        color: #6B66D8 !important;
+    }
+
+    .workflow-step:first-child .workflow-icon {
+        background: linear-gradient(135deg,#6678E8,#7A67DF) !important;
+        color: #FFFFFF !important;
+    }
+
+    .workflow-line {
+        background: #DADAF2 !important;
+    }
+
+    @keyframes blueprint-glow {
+        0%, 100% {
+            box-shadow: 0 24px 60px rgba(91,83,178,.085), inset 0 1px 0 rgba(255,255,255,.94);
+        }
+        50% {
+            box-shadow: 0 27px 66px rgba(105,91,195,.13), inset 0 1px 0 rgba(255,255,255,.97);
+        }
+    }
+
+
+    /* =========================================================
+       UPLOAD PALETTE FINAL — force Upload page to match
+       Analysis / Simulation palette more closely
+       ========================================================= */
+
+    .workflow-brand {
+        color: #4665E8 !important;
+    }
+
+    .st-key-workflow_navigation [data-testid="stButton"] button {
+        color: #7F8CAA !important;
+    }
+
+    .st-key-workflow_navigation [data-testid="stButton"] button::before {
+        background: #E0E5F0 !important;
+        box-shadow: 0 0 0 1px #D6DEEE !important;
+    }
+
+    .st-key-workflow_navigation [data-testid="stButton"] button[kind="primary"] {
+        color: #5E70DF !important;
+    }
+
+    .st-key-workflow_navigation [data-testid="stButton"] button[kind="primary"]::before {
+        background: linear-gradient(135deg,#6F7CE7 0%, #7E74E2 100%) !important;
+        box-shadow: 0 0 0 5px rgba(111,124,231,.12) !important;
+    }
+
+    .st-key-workflow_navigation [data-testid="stButton"] button:disabled {
+        color: #98A4BC !important;
+    }
+
+    .main-title {
+        color: #18223C !important;
+    }
+
+    .subtitle {
+        color: #8090A9 !important;
+    }
+
+    .intake-kicker {
+        color: #7B7FB6 !important;
+    }
+
+    .intake-kicker::before,
+    .intake-kicker::after {
+        background: linear-gradient(90deg, transparent, #D4D7F2) !important;
+    }
+
+    div[data-testid="stFileUploader"]::before,
+    div[data-testid="stFileUploader"]::after {
+        color: #7B7FB6 !important;
+    }
+
+    div[data-testid="stFileUploader"] section {
+        background-color: rgba(249,248,255,.92) !important;
+        background-image:
+            linear-gradient(rgba(111,124,231,.028) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(126,116,226,.028) 1px, transparent 1px),
+            radial-gradient(circle at 18% 86%, rgba(115,139,235,.10), transparent 11rem),
+            radial-gradient(circle at 84% 16%, rgba(158,130,229,.11), transparent 11rem) !important;
+        border-color: #D2D6F3 !important;
+        box-shadow:
+            0 24px 58px rgba(93,98,168,.08),
+            inset 0 1px 0 rgba(255,255,255,.96) !important;
+    }
+
+    div[data-testid="stFileUploader"] section:hover {
+        background-color: rgba(250,249,255,.97) !important;
+        border-color: #B7B8EE !important;
+        box-shadow:
+            0 26px 62px rgba(93,98,168,.11),
+            inset 0 1px 0 rgba(255,255,255,.98) !important;
+    }
+
+    div[data-testid="stFileUploader"] section::before {
+        background-color: #6D78E5 !important;
+        background-image:
+            linear-gradient(145deg, rgba(255,255,255,.20), transparent 48%),
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V3'/%3E%3Cpath d='m7 8 5-5 5 5'/%3E%3Cpath d='M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4'/%3E%3C/svg%3E") !important;
+        background-position: center, center !important;
+        background-repeat: no-repeat, no-repeat !important;
+        background-size: auto, 36px 36px !important;
+        box-shadow:
+            0 13px 28px rgba(97,101,190,.20),
+            0 0 0 8px rgba(122,111,223,.06) !important;
+    }
+
+    .selected-file {
+        border-color: #DBE0F0 !important;
+        background: rgba(255,255,255,.82) !important;
+        box-shadow: 0 10px 24px rgba(91,83,178,.055) !important;
+    }
+
+    .selected-file::after {
+        background: linear-gradient(180deg,#6E79E8 0%, #7B6FDF 100%) !important;
+    }
+
+    .file-badge,
+    .file-icon {
+        color: #6964D8 !important;
+        background: #F2F0FE !important;
+    }
+
+    .file-name {
+        color: #27324B !important;
+    }
+
+    .file-size {
+        color: #95A1B9 !important;
+    }
+
+    .file-status {
+        color: #57A95F !important;
+    }
+
+    .st-key-remove_selected_file button {
+        color: #818DA6 !important;
+        border: 1px solid #D8DDF0 !important;
+        background: rgba(255,255,255,.72) !important;
+        box-shadow: none !important;
+    }
+
+    .st-key-remove_selected_file button:hover {
+        color: #6F7892 !important;
+        border-color: #C8D0E7 !important;
+        background: rgba(255,255,255,.90) !important;
+        box-shadow: 0 8px 18px rgba(91,83,178,.05) !important;
+    }
+
+    .st-key-analyze_project button[kind="primary"] {
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg,#5F70E2 0%, #7569DB 100%) !important;
+        border-color: #6F67DA !important;
+        box-shadow: 0 12px 26px rgba(95,112,226,.18) !important;
+    }
+
+    .st-key-analyze_project button[kind="primary"]:hover {
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg,#5668D9 0%, #6C5FD2 100%) !important;
+        border-color: #6659CB !important;
+        box-shadow: 0 14px 28px rgba(95,112,226,.22) !important;
+    }
+
+
+    /* Normalize Upload header arrows so they match the other pages exactly */
+    .st-key-workflow_navigation .st-key-workflow_previous button,
+    .st-key-workflow_navigation .st-key-workflow_next button {
+        width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        display: grid !important;
+        place-items: center !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: #4F6ED0 !important;
+        font-family: Inter, "Segoe UI Symbol", "Arial Unicode MS", sans-serif !important;
+        font-size: 22px !important;
+        font-weight: 400 !important;
+        line-height: 1 !important;
+        letter-spacing: 0 !important;
+        transform: none !important;
+    }
+
+    .st-key-workflow_navigation .st-key-workflow_previous button p,
+    .st-key-workflow_navigation .st-key-workflow_next button p {
+        margin: 0 !important;
+        color: inherit !important;
+        font-family: Inter, "Segoe UI Symbol", "Arial Unicode MS", sans-serif !important;
+        font-size: 22px !important;
+        font-weight: 400 !important;
+        line-height: 1 !important;
+        letter-spacing: 0 !important;
+        transform: translateY(-1px) !important;
+    }
+
+    .st-key-workflow_navigation .st-key-workflow_previous button:hover,
+    .st-key-workflow_navigation .st-key-workflow_next button:hover,
+    .st-key-workflow_navigation .st-key-workflow_previous button:active,
+    .st-key-workflow_navigation .st-key-workflow_next button:active,
+    .st-key-workflow_navigation .st-key-workflow_previous button:focus-visible,
+    .st-key-workflow_navigation .st-key-workflow_next button:focus-visible {
+        color: #4F6ED0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+
+    .st-key-workflow_navigation .st-key-workflow_previous button:disabled,
+    .st-key-workflow_navigation .st-key-workflow_next button:disabled {
+        color: #8395B5 !important;
+        opacity: 1 !important;
+    }
+
 </style>
 """,
     unsafe_allow_html=True
@@ -1900,6 +2481,15 @@ if uploaded_file is not None:
                     st.session_state["analysis_output"] = analysis_result
                     st.session_state["simulation_output"] = simulation_result
                     st.session_state["analyzed_filename"] = uploaded_file.name
+                    save_dev_preview(
+                        analysis_result,
+                        simulation_result,
+                        project_dataframe,
+                        uploaded_file.name,
+                    )
+                    # Cover the outgoing Upload DOM during the destination rerun.
+                    # The overlay is removed only after render_dashboard_ui() returns.
+                    st.session_state["route_transition_target"] = "analysis"
                     st.query_params["view"] = "analysis"
                     st.rerun()
                 except Exception:
