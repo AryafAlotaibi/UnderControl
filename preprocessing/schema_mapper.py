@@ -1,6 +1,8 @@
 import json
 import pandas as pd
 
+from openai import APIConnectionError, APITimeoutError, APIStatusError
+
 from llm.model import client, SCHEMA_MODEL
 from prompts.schema_mapping_prompt import build_schema_mapping_prompt
 
@@ -378,15 +380,34 @@ class SchemaMapper:
             column_samples=schema_info["column_samples"]
         )
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            response_format={
-                "type": "json_object"
-            }
-        )
+        # Call the LLM and handle API errors
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={
+                    "type": "json_object"
+                }
+            )
+
+        except APITimeoutError as error:
+            raise RuntimeError(
+                "Schema mapping failed: the LLM request timed out."
+            ) from error
+
+        except APIConnectionError as error:
+            raise RuntimeError(
+                "Schema mapping failed: could not connect "
+                "to the LLM service."
+            ) from error
+
+        except APIStatusError as error:
+            raise RuntimeError(
+                "Schema mapping failed: the LLM service returned "
+                f"HTTP status {error.status_code}."
+            ) from error
 
         result = json.loads(
             response.choices[0].message.content
