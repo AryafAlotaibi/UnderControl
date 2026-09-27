@@ -1,3 +1,4 @@
+
 """
 UnderControl Analysis Pipeline
 
@@ -38,6 +39,8 @@ Flow:
         }
 """
 
+import pandas as pd
+
 from preprocessing.schema_mapper import SchemaMapper
 from analysis.project_analyzer import ProjectAnalyzer
 
@@ -68,12 +71,33 @@ def run_analysis(user_df):
     """
     Run the complete UnderControl pipeline.
 
+    Args:
+        user_df: Input project data as a pandas DataFrame.
+
     Returns:
         dict containing:
             - analysis
             - simulation
             - project_dataframe
+
+    Raises:
+        TypeError: If the input is not a pandas DataFrame.
+        ValueError: If the input DataFrame is empty.
     """
+
+    # =====================================================
+    # 0. Validate input data
+    # =====================================================
+
+    if not isinstance(user_df, pd.DataFrame):
+        raise TypeError(
+            "Input data must be a pandas DataFrame."
+        )
+
+    if user_df.empty:
+        raise ValueError(
+            "Input data is empty. Please upload a CSV file with data."
+        )
 
     # =====================================================
     # 1. Standardize uploaded data
@@ -83,9 +107,7 @@ def run_analysis(user_df):
         user_df
     )
 
-    standardized_df = mapping_result[
-        "dataframe"
-    ]
+    standardized_df = mapping_result["dataframe"]
 
     # =====================================================
     # 2. Prepare project data and calculate metrics
@@ -97,13 +119,8 @@ def run_analysis(user_df):
         standardized_df
     )
 
-    project_df = prepared_project[
-        "dataframe"
-    ]
-
-    project_metrics = prepared_project[
-        "metrics"
-    ]
+    project_df = prepared_project["dataframe"]
+    project_metrics = prepared_project["metrics"]
 
     # =====================================================
     # 3. Build Live RAG
@@ -121,14 +138,10 @@ def run_analysis(user_df):
     # 4. Connect Ground Truth RAG
     # =====================================================
 
-    ground_truth_retriever = (
-        GroundTruthRetriever()
-    )
+    ground_truth_retriever = GroundTruthRetriever()
 
-    ground_truth_rag_tool = (
-        build_ground_truth_rag_tool(
-            ground_truth_retriever
-        )
+    ground_truth_rag_tool = build_ground_truth_rag_tool(
+        ground_truth_retriever
     )
 
     # =====================================================
@@ -144,9 +157,7 @@ def run_analysis(user_df):
     analysis_tools = build_analysis_tools(
         project_metrics=project_metrics,
         live_rag_tool=live_rag_tool,
-        ground_truth_rag_tool=(
-            ground_truth_rag_tool
-        ),
+        ground_truth_rag_tool=ground_truth_rag_tool,
     )
 
     # =====================================================
@@ -160,19 +171,15 @@ def run_analysis(user_df):
         verbose=False,
     )
 
-    analysis_result = (
-        analysis_agent.analyze()
-    )
+    analysis_result = analysis_agent.analyze()
 
     # =====================================================
     # 8. Build Simulation Agent tools
     # =====================================================
 
-    simulation_tools = (
-        build_simulation_tools(
-            project_df=project_df,
-            live_rag_tool=live_rag_tool,
-        )
+    simulation_tools = build_simulation_tools(
+        project_df=project_df,
+        live_rag_tool=live_rag_tool,
     )
 
     # =====================================================
@@ -187,9 +194,7 @@ def run_analysis(user_df):
         verbose=False,
     )
 
-    simulation_result = (
-        simulation_agent.simulate()
-    )
+    simulation_result = simulation_agent.simulate()
 
     # =====================================================
     # 10. Return complete pipeline result
