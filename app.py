@@ -34,6 +34,7 @@ def clear_analysis_result():
         "analysis_output",
         "simulation_output",
         "project_dataframe",
+        "project_warnings",
         "analyzed_filename",
     ):
         st.session_state.pop(key, None)
@@ -295,6 +296,12 @@ if (
 
 active_stage = render_workflow_navigation()
 if active_stage in ("analysis", "simulation"):
+    if st.session_state.get("project_warnings"):
+        st.warning(
+            "Some date or numeric values could not be interpreted. "
+            "The analysis may be incomplete."
+        )
+
     importlib.reload(dashboard_white_ui)
     dashboard_white_ui.render_dashboard_ui(
         analysis_output=st.session_state.get("analysis_output"),
@@ -1680,6 +1687,7 @@ if uploaded_file is not None:
                     analysis_result = pipeline_result.get("analysis")
                     simulation_result = pipeline_result.get("simulation")
                     project_dataframe = pipeline_result.get("project_dataframe")
+                    project_warnings = pipeline_result.get("warnings", [])
 
                     if hasattr(analysis_result, "model_dump"):
                         analysis_result = analysis_result.model_dump()
@@ -1699,6 +1707,7 @@ if uploaded_file is not None:
                     st.session_state["project_dataframe"] = project_dataframe.copy()
                     st.session_state["analysis_output"] = analysis_result
                     st.session_state["simulation_output"] = simulation_result
+                    st.session_state["project_warnings"] = project_warnings
                     st.session_state["analyzed_filename"] = uploaded_file.name
                     save_dev_preview(
                         analysis_result,
@@ -1711,11 +1720,35 @@ if uploaded_file is not None:
                     st.session_state["route_transition_target"] = "analysis"
                     st.query_params["view"] = "analysis"
                     st.rerun()
-                except Exception:
+                #except Exception:
+                    #analysis_motion.empty()
+                    #clear_analysis_result()
+                    #logging.getLogger(__name__).exception("Project analysis failed")
+                    #st.error("We couldn't complete the analysis because of a technical problem. Please try again. If the problem continues, contact your project administrator.")
+                except Exception as error:
                     analysis_motion.empty()
                     clear_analysis_result()
-                    logging.getLogger(__name__).exception("Project analysis failed")
-                    st.error("We couldn't complete the analysis because of a technical problem. Please try again. If the problem continues, contact your project administrator.")
+
+                    logging.getLogger(__name__).exception(
+                        "Project analysis failed"
+                    )
+
+                    if "doesn't contain enough task information" in str(error):
+                        st.error(str(error))
+
+                    elif "HTTP status 429" in str(error):
+                        st.error(
+                            "The AI service is currently unavailable because "
+                            "the project's usage limit may have been reached. "
+                            "Please contact your project administrator."
+                        )
+
+                    else:
+                        st.error(
+                            "We couldn't complete the analysis because of a "
+                            "technical problem. Please try again. If the problem "
+                            "continues, contact your project administrator."
+                        )
 
 
 

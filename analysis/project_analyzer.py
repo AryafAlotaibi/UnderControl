@@ -1,3 +1,4 @@
+
 import pandas as pd
 
 
@@ -35,34 +36,72 @@ class ProjectAnalyzer:
         Prepare the standardized project DataFrame
         and calculate deterministic project metrics.
 
-        This step does not perform root-cause analysis
-        or generate conclusions.
+        Invalid date and numeric values are converted
+        and reported through the warnings list.
         """
 
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
 
         df = df.copy()
+        warnings = []
 
+        # Convert dates and detect invalid values
         for column in self.DATE_COLUMNS:
             if column in df.columns:
-                df[column] = pd.to_datetime(
-                    df[column],
+                original_values = df[column]
+
+                converted_values = pd.to_datetime(
+                    original_values,
                     errors="coerce",
                 )
 
+                invalid_mask = (
+                    original_values.notna()
+                    & converted_values.isna()
+                )
+
+                if invalid_mask.any():
+                    invalid_count = int(invalid_mask.sum())
+
+                    warnings.append(
+                        f"Column '{column}' contains "
+                        f"{invalid_count} invalid date value(s)."
+                    )
+
+                df[column] = converted_values
+
+        # Convert numeric values and detect invalid values
         for column in self.NUMERIC_COLUMNS:
             if column in df.columns:
-                df[column] = pd.to_numeric(
-                    df[column],
+                original_values = df[column]
+
+                converted_values = pd.to_numeric(
+                    original_values,
                     errors="coerce",
                 )
+
+                invalid_mask = (
+                    original_values.notna()
+                    & converted_values.isna()
+                )
+
+                if invalid_mask.any():
+                    invalid_count = int(invalid_mask.sum())
+
+                    warnings.append(
+                        f"Column '{column}' contains "
+                        f"{invalid_count} invalid numeric value(s)."
+                    )
+
+                df[column] = converted_values
 
         metrics = self._calculate_metrics(df)
 
         return {
             "dataframe": df,
             "metrics": metrics,
+            "warnings": warnings,
         }
 
     def _calculate_metrics(self, df):
@@ -129,7 +168,12 @@ class ProjectAnalyzer:
         if column not in df.columns:
             return {}
 
-        values = df[column].dropna().astype(str).str.strip()
+        values = (
+            df[column]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
 
         values = values[values != ""]
 

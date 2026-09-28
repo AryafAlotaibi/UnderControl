@@ -3,13 +3,16 @@
 UnderControl Analysis Pipeline
 
 Flow:
+
     User CSV
         -> SchemaMapper
         -> Standardized DataFrame
+        -> Task Information Validation
 
     Standardized DataFrame
         -> ProjectAnalyzer
         -> Project Metrics
+        -> Data Quality Warnings
 
     Standardized DataFrame
         -> Live RAG
@@ -35,7 +38,8 @@ Flow:
         {
             "analysis": AnalysisOutput,
             "simulation": SimulationOutput,
-            "project_dataframe": DataFrame
+            "project_dataframe": DataFrame,
+            "warnings": list
         }
 """
 
@@ -79,10 +83,12 @@ def run_analysis(user_df):
             - analysis
             - simulation
             - project_dataframe
+            - warnings
 
     Raises:
         TypeError: If the input is not a pandas DataFrame.
-        ValueError: If the input DataFrame is empty.
+        ValueError: If the input is empty or does not contain
+                    recognizable task information.
     """
 
     # =====================================================
@@ -103,11 +109,37 @@ def run_analysis(user_df):
     # 1. Standardize uploaded data
     # =====================================================
 
-    mapping_result = SchemaMapper().map_schema(
-        user_df
-    )
+    mapping_result = SchemaMapper().map_schema(user_df)
 
     standardized_df = mapping_result["dataframe"]
+
+    # =====================================================
+    # 1.1 Validate task information
+    # =====================================================
+
+    task_info_columns = [
+        "issue_id",
+        "issue_key",
+        "text",
+    ]
+
+    has_task_information = any(
+        column in standardized_df.columns
+        and standardized_df[column]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .ne("")
+        .any()
+        for column in task_info_columns
+    )
+
+    if not has_task_information:
+        raise ValueError(
+            "This file doesn't contain enough task information. "
+            "Upload a CSV with task IDs or descriptions and details "
+            "such as status, priority, or dates."
+        )
 
     # =====================================================
     # 2. Prepare project data and calculate metrics
@@ -121,14 +153,13 @@ def run_analysis(user_df):
 
     project_df = prepared_project["dataframe"]
     project_metrics = prepared_project["metrics"]
+    project_warnings = prepared_project["warnings"]
 
     # =====================================================
     # 3. Build Live RAG
     # =====================================================
 
-    live_collection = build_live_rag(
-        project_df
-    )
+    live_collection = build_live_rag(project_df)
 
     live_rag_tool = build_live_rag_tool(
         live_collection
@@ -204,4 +235,5 @@ def run_analysis(user_df):
         "analysis": analysis_result,
         "simulation": simulation_result,
         "project_dataframe": project_df,
+        "warnings": project_warnings,
     }
